@@ -67,6 +67,7 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)
     implementation(libs.zxing.core)
+    implementation(libs.gson)
 
     implementation(libs.pleos.vehicle)
     implementation(libs.pleos.tts)

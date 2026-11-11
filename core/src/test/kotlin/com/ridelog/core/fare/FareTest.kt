@@ -31,6 +31,15 @@ class FareTest {
         assertTrue(items.single().estimated)
     }
 
+    @Test fun `one method per trip avoids double counting a short zero-soc leg`() {
+        // 1% 해상도 때문에 짧은 구간은 SOC 0, 다음 구간에 몰림 → 거리 비율로 재배분
+        val legs = listOf(leg(10.0, setOf("a", "b"), socPct = 0.0), leg(30.0, setOf("a"), socPct = 10.0))
+        val e = EnergyCostCalculator.energyOfTrip(legs, config)
+        assertEquals(0.1 * 77.4 * 0.25, e[0].kwh, 1e-9)
+        assertEquals(0.1 * 77.4 * 0.75, e[1].kwh, 1e-9)
+        assertEquals(0.1 * 77.4, e.sumOf { it.kwh }, 1e-9)
+    }
+
     @Test fun `four people share one full leg equally`() {
         val items = listOf(CostItem("전기", 20000, "a", setOf("a", "b", "c", "d")))
         val s = FareCalculator.settle(listOf("a", "b", "c", "d"), items)

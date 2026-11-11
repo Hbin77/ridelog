@@ -109,7 +109,7 @@ class VehicleSpeechIn(private val context: Context) : SpeechIn {
                 }
                 override fun onUpdatedEpdData(p0: Long, p1: Long) = Unit
                 override fun onStartedRecognition() = Unit
-                override fun onEndedRecognition() = Unit
+                override fun onEndedRecognition() = deliver(null) // 최종 결과 없이 끝나면 대기를 푼다
                 override fun onError(p0: ai.pleos.playground.stt.constant.ErrorType) {
                     Log.w(TAG, "Pleos STT 오류 $p0"); deliver(null)
                 }
@@ -145,9 +145,10 @@ class VehicleSpeechIn(private val context: Context) : SpeechIn {
         } else listenWithAndroid()
     }
 
+    /** 대체 인식기도 기기 내 인식만 쓴다 (음성이 기기 밖으로 나가지 않게). */
     private fun listenWithAndroid() {
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) { deliver(null); return }
-        val recognizer = SpeechRecognizer.createSpeechRecognizer(context)
+        if (android.os.Build.VERSION.SDK_INT < 31 || !SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) { deliver(null); return }
+        val recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
         recognizer.setRecognitionListener(object : RecognitionListener {
             override fun onResults(results: Bundle?) {
                 deliver(results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull())

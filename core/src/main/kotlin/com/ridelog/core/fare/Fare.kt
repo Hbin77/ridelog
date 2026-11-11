@@ -26,17 +26,34 @@ object EnergyCostCalculator {
     /** 적분이 구간 거리의 이 비율 이상을 덮으면 적분값을 쓴다. */
     private const val MIN_INTEGRATED_COVERAGE = 0.8
 
-    fun energyOf(leg: Leg, config: EnergyConfig): LegEnergy {
-        val distance = leg.distanceKm
-        if (distance > 0 && leg.integratedKm >= distance * MIN_INTEGRATED_COVERAGE) {
-            val scaled = leg.integratedKwh * (distance / leg.integratedKm)
-            return LegEnergy(scaled, EnergyMethod.INTEGRATED_EFFICIENCY)
+    /** 구간 하나만 볼 때의 에너지 (단독 계산·테스트용). */
+    fun energyOf(leg: Leg, config: EnergyConfig): LegEnergy = energyOfTrip(listOf(leg), config).single()
+
+    /**
+     * 여행 전체에 한 가지 방법만 쓴다 — 구간마다 방법이 섞이면 같은 에너지가 두 번 잡힐 수 있다.
+     * 1) 모든 구간이 순간 전비 적분으로 덮이면 적분값
+     * 2) 배터리 용량과 SOC 감소가 있으면 여행 전체 SOC 감소 에너지를 거리 비율로 배분 (1% 해상도 보정)
+     * 3) 둘 다 없으면 기본 전비 추정
+     */
+    fun energyOfTrip(legs: List<Leg>, config: EnergyConfig): List<LegEnergy> {
+        val driven = legs.filter { it.distanceKm > 0 }
+        if (driven.isNotEmpty() && driven.all { it.integratedKm >= it.distanceKm * MIN_INTEGRATED_COVERAGE }) {
+            return legs.map {
+                if (it.distanceKm <= 0) LegEnergy(0.0, EnergyMethod.INTEGRATED_EFFICIENCY)
+                else LegEnergy(it.integratedKwh * (it.distanceKm / it.integratedKm), EnergyMethod.INTEGRATED_EFFICIENCY)
+            }
         }
         val capacity = config.batteryCapacityKwh
-        if (capacity != null && leg.socConsumedPct > 0) {
-            return LegEnergy(leg.socConsumedPct / 100.0 * capacity, EnergyMethod.SOC_DROP)
+        val totalSoc = legs.sumOf { it.socConsumedPct }
+        val totalKm = legs.sumOf { it.distanceKm }
+        if (capacity != null && totalSoc > 0) {
+            val totalKwh = totalSoc / 100.0 * capacity
+            return legs.map {
+                val share = if (totalKm > 0) it.distanceKm / totalKm else it.socConsumedPct / totalSoc
+                LegEnergy(totalKwh * share, EnergyMethod.SOC_DROP)
+            }
         }
-        return LegEnergy(distance / config.defaultKmPerKwh, EnergyMethod.DEFAULT_EFFICIENCY)
+        return legs.map { LegEnergy(it.distanceKm / config.defaultKmPerKwh, EnergyMethod.DEFAULT_EFFICIENCY) }
     }
 
     fun costWon(energy: LegEnergy, config: EnergyConfig): Long =
@@ -69,9 +86,10 @@ data class Settlement(
 object FareCalculator {
 
     /** 구간 에너지 비용은 차주(운전자)가 결제한 것으로 보고, 그 구간 탑승 멤버가 균등 부담한다. */
-    fun energyItems(legs: List<Leg>, ownerId: String, config: EnergyConfig): List<CostItem> =
-        legs.mapIndexedNotNull { i, leg ->
-            val energy = EnergyCostCalculator.energyOf(leg, config)
+    fun energyItems(legs: List<Leg>, ownerId: String, config: EnergyConfig): List<CostItem> {
+        val energies = EnergyCostCalculator.energyOfTrip(legs, config)
+        return legs.mapIndexedNotNull { i, leg ->
+            val energy = energies[i]
             val cost = EnergyCostCalculator.costWon(energy, config)
             val sharers = leg.memberIds.ifEmpty { setOf(ownerId) }
             if (cost <= 0) null
@@ -84,6 +102,7 @@ object FareCalculator {
                 kind = CostKind.ENERGY,
             )
         }
+    }
 
     fun expenseItems(expenses: List<Expense>): List<CostItem> =
         expenses.filter { it.amountWon > 0 && it.sharedBy.isNotEmpty() }

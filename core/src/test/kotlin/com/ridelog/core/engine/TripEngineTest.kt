@@ -138,6 +138,34 @@ class TripEngineTest {
         assertEquals(18.0, leg.integratedKm, 1e-9)
     }
 
+    @Test fun `soc flapping while driving nets out`() {
+        val (s, _) = fourSeatTrip().apply(DrivingState(1, true), Soc(2, 79.0), Soc(3, 80.0), Soc(4, 79.0), Soc(5, 78.0))
+        assertEquals(2.0, TripEngine.finish(s, 6).state.legs.single().socConsumedPct, 1e-9)
+    }
+
+    @Test fun `known seat state at start delays pickup and flags strangers`() {
+        val start = TripEngine.start(
+            0, mapOf(SeatId.DRIVER to me, SeatId.FRONT_PASSENGER to minsu, SeatId.REAR_LEFT to seoyeon),
+            1000.0, 80.0, beltSupported = true, occupiedSeats = setOf(SeatId.FRONT_PASSENGER, SeatId.REAR_RIGHT),
+        )
+        assertEquals(setOf(SeatId.DRIVER, SeatId.FRONT_PASSENGER, SeatId.REAR_RIGHT), start.onboard)
+        val (s, _) = start.apply(
+            DrivingState(1, true), Odometer(2, 1010.0), DrivingState(3, false),
+            SeatOccupancy(4, SeatId.REAR_LEFT, true), SeatBelt(5, SeatId.REAR_LEFT, true),
+            DrivingState(6, true), Odometer(7, 1020.0),
+        )
+        val legs = TripEngine.finish(s, 8).state.legs
+        assertEquals(setOf("me", "m"), legs[0].memberIds)
+        assertEquals(setOf(SeatId.REAR_RIGHT), legs[0].unassignedSeats)
+        assertEquals(setOf("me", "m", "s"), legs[1].memberIds)
+    }
+
+    @Test fun `non finite values are ignored`() {
+        val (s, _) = fourSeatTrip().apply(Odometer(1, Double.NaN), Soc(2, Double.NaN))
+        assertEquals(1000.0, s.odometerKm, 1e-9)
+        assertEquals(80.0, s.socPct!!, 1e-9)
+    }
+
     @Test fun `events after finish are ignored`() {
         val done = TripEngine.finish(fourSeatTrip(), 1).state
         val after = TripEngine.reduce(done, Odometer(2, 2000.0)).state

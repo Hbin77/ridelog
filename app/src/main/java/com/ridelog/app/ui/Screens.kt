@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,10 +68,14 @@ fun ScreenFrame(title: String, onTitleLongPress: (() -> Unit)? = null, content: 
 // ---------- 홈 ----------
 
 @Composable
-fun HomeScreen(onStart: () -> Unit, onDebug: () -> Unit) {
+fun HomeScreen(onStart: () -> Unit, onHistory: () -> Unit, onSettings: () -> Unit, onDebug: () -> Unit) {
     ScreenFrame("라이드로그", onTitleLongPress = onDebug) {
         Text("함께 탄 이동의 비용을, 차가 기록하고 나눠드려요.", style = RideType.body, color = Ride.colors.onSurfaceMuted)
         Spacer(Modifier.weight(1f))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            PrimaryButton("지난 여행", onHistory, Modifier.weight(1f), secondary = true)
+            PrimaryButton("설정", onSettings, Modifier.weight(1f), secondary = true)
+        }
         PrimaryButton("여행 시작", onStart, Modifier.fillMaxWidth(), icon = Icons.Filled.PlayArrow)
     }
 }
@@ -198,7 +203,7 @@ fun ReviewScreen(state: UiState, controller: TripController, onDone: () -> Unit)
     val trip = state.trip ?: return
     val s = state.settlement ?: return
     val c = Ride.colors
-    var showSend by remember { mutableStateOf(false) }
+    var showSend by rememberSaveable { mutableStateOf(false) }
     val names = trip.members.associate { it.id to it.name }
     if (showSend) {
         SendScreen(
@@ -261,7 +266,8 @@ fun SendScreen(text: String, onBack: () -> Unit, onDone: () -> Unit) {
     ScreenFrame("폰으로 받기") {
         Text("각자 폰 카메라로 찍으면 정산 내용이 열려요.", style = RideType.body, color = c.onSurfaceMuted)
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Image(qr, contentDescription = "정산 내용 QR 코드", modifier = Modifier.size(320.dp).background(c.surface))
+            if (qr != null) Image(qr, contentDescription = "정산 내용 QR 코드", modifier = Modifier.size(320.dp).background(c.surface))
+            else Text("내용이 길어 QR을 만들 수 없어요. 아래 내용을 확인해 주세요", style = RideType.body, color = c.warning)
         }
         Text(text, style = RideType.label, color = c.onSurfaceMuted, textAlign = TextAlign.Start)
         Spacer(Modifier.weight(1f))

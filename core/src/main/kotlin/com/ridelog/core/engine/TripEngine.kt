@@ -46,7 +46,7 @@ data class TripState(
     val ended: Boolean = false,
 ) {
     val onboardMemberIds: Set<String> get() = onboard.mapNotNull { assignments[it]?.id }.toSet()
-    val members: List<Member> get() = assignments.values.distinctBy { it.id }
+    val members: List<Member> get() = assignments.entries.sortedBy { it.key.ordinal }.map { it.value }.distinctBy { it.id }
 }
 
 data class Step(val state: TripState, val outputs: List<EngineOutput>)
@@ -63,20 +63,26 @@ data class Step(val state: TripState, val outputs: List<EngineOutput>)
  */
 object TripEngine {
 
+    /**
+     * @param occupiedSeats 출발 시점에 차가 알려준 점유 좌석. null 이면(신호 없음) 배정 좌석이 모두 탔다고 본다.
+     *   알려진 경우 배정됐지만 비어 있는 좌석은 나중에 탈 때부터, 배정 안 된 점유 좌석은 "미등록"으로 기록한다.
+     */
     fun start(
         atMillis: Long,
         assignments: Map<SeatId, Member>,
         odometerKm: Double,
         socPct: Double?,
         beltSupported: Boolean,
+        occupiedSeats: Set<SeatId>? = null,
     ): TripState {
-        val onboard = setOf(SeatId.DRIVER) + assignments.keys
+        val occupied = (occupiedSeats ?: assignments.keys) + SeatId.DRIVER
+        val onboard = occupied
         return TripState(
             startMillis = atMillis,
             assignments = assignments,
             beltSupported = beltSupported,
             onboard = onboard,
-            occupied = onboard,
+            occupied = occupied,
             odometerKm = odometerKm,
             socPct = socPct,
             currentLeg = OpenLeg(atMillis, odometerKm, onboard),
@@ -167,7 +173,7 @@ object TripEngine {
             endKm = s.odometerKm,
             memberIds = open.seats.mapNotNull { s.assignments[it]?.id }.toSet(),
             unassignedSeats = open.seats.filter { it !in s.assignments && it != SeatId.DRIVER }.toSet(),
-            socConsumedPct = open.socConsumedPct,
+            socConsumedPct = open.socConsumedPct.coerceAtLeast(0.0),
             integratedKwh = open.integratedKwh,
             integratedKm = open.integratedKm,
         )
@@ -198,6 +204,7 @@ object TripEngine {
     // ---- 에너지 ----
 
     private fun onOdometer(state: TripState, km: Double): TripState {
+        if (!km.isFinite()) return state
         val delta = km - state.odometerKm
         if (delta <= 0) return state
         val eff = state.efficiencyKmPerKwh
@@ -209,9 +216,12 @@ object TripEngine {
     }
 
     private fun onSoc(state: TripState, e: VehicleEvent.Soc): Step {
+        if (!e.percent.isFinite()) return Step(state, emptyList())
         val prev = state.socPct ?: return Step(state.copy(socPct = e.percent), emptyList())
         val drop = prev - e.percent
-        val leg = if (drop > 0) state.currentLeg.copy(socConsumedPct = state.currentLeg.socConsumedPct + drop) else state.currentLeg
+        // 감소는 소비, 주행 중 증가(회생제동·1% 해상도 흔들림)는 상계, 정차·충전 중 증가는 충전으로 제외
+        val countable = drop > 0 || (state.driving && !state.charging)
+        val leg = if (countable) state.currentLeg.copy(socConsumedPct = state.currentLeg.socConsumedPct + drop) else state.currentLeg
         var s = state.copy(socPct = e.percent, currentLeg = leg)
         // 충전 신호가 없더라도 정차 중 SOC가 오르면 충전으로 본다
         if (drop < 0 && !s.driving && !s.charging) {

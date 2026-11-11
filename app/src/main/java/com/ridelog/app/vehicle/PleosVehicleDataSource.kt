@@ -49,7 +49,8 @@ class PleosVehicleDataSource(
     private var vehicle: Vehicle? = null
     private var car: Car? = null
     private var uxManager: CarUxRestrictionsManager? = null
-    private val unregisters = mutableListOf<() -> Unit>()
+    private val unregisters: MutableList<() -> Unit> = java.util.Collections.synchronizedList(mutableListOf())
+    private val lastOccupancy = java.util.concurrent.ConcurrentHashMap<SeatId, Boolean>()
 
     /**
      * Pleos Connect Emulator 2.1.0 Virtual Console은 좌석 점유를 반대로 전달한다
@@ -86,11 +87,15 @@ class PleosVehicleDataSource(
         vehicle = v
         startDrivingState()
         if (v == null) return
-        // initialize()는 서비스 바인딩이 비동기이므로 잠시 후 등록한다.
+        // initialize()는 서비스 바인딩이 비동기이므로 잠시 후 등록하고, 실패하면 몇 번 다시 시도한다.
         scope.launch {
-            delay(1_000)
-            registerSeats(v)
-            registerEnergy(v)
+            for (attempt in 1..4) {
+                delay(1_000L * attempt)
+                val ok = runCatching { registerSeats(v); registerEnergy(v) }
+                    .onFailure { log("리스너 등록 실패($attempt): ${it.message}"); unregisters.toList().forEach { u -> runCatching(u) }; unregisters.clear() }
+                    .isSuccess
+                if (ok) break
+            }
         }
     }
 
@@ -104,7 +109,11 @@ class PleosVehicleDataSource(
                 val area = SeatArea(value)
                 val l = object : SeatOccupancyListener {
                     override fun onSeatOccupancyUpdated(p0: Boolean?) {
-                        p0?.let { emit(VehicleEvent.SeatOccupancy(clock(), id, it != invertOccupancy)) }
+                        p0?.let {
+                            val occupied = it != invertOccupancy
+                            lastOccupancy[id] = occupied
+                            emit(VehicleEvent.SeatOccupancy(clock(), id, occupied))
+                        }
                     }
                     override fun onFailed(p0: Exception) = log("점유 리스너 실패 $id: ${p0.message}")
                 }
@@ -178,6 +187,9 @@ class PleosVehicleDataSource(
             }
         }.onFailure { log("주행 상태(CarUxRestrictions) 연결 실패: ${it.message}") }
     }
+
+    /** 마지막으로 받은 좌석 점유 상태 (출발 시점 좌석 확인용). */
+    fun occupiedSeats(): Set<SeatId> = lastOccupancy.filterValues { it }.keys + SeatId.DRIVER
 
     override suspend fun snapshot(): VehicleSnapshot {
         val v = vehicle ?: return VehicleSnapshot(null, null, null)

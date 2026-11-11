@@ -11,9 +11,9 @@
     <uses-permission android:name="pleos.car.permission.TTS_SERVICE" />
     <uses-permission android:name="pleos.car.permission.STT_SERVICE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
+        android:name=".RideLogApp"
         android:allowBackup="false"
         android:label="라이드로그"
         android:supportsRtl="true"

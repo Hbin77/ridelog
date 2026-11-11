@@ -51,6 +51,27 @@ class VoiceParserTest {
         assertNull(VoiceExpenseParser.parse("간식 샀어", members))
     }
 
+    @Test fun `label ending in a numeral syllable is not absorbed into the amount`() {
+        VoiceExpenseParser.parse("식사 만원 내가 냈어", members)!!.let { assertEquals(10_000L, it.amountWon); assertEquals("식사", it.label) }
+        assertEquals(10_000L, VoiceExpenseParser.parse("장어구이 만원", members)!!.amountWon)
+        assertEquals(15_000L, VoiceExpenseParser.parse("점심 식사 만 오천원", members)!!.amountWon)
+        assertEquals("식사", VoiceExpenseParser.parse("식사 3만원", members)!!.label)
+        assertEquals(30_000L, VoiceExpenseParser.parse("식사3만원", members)!!.amountWon)
+        assertEquals(35_000L, VoiceExpenseParser.parse("숙소 3.5만원", members)!!.amountWon)
+        assertNull(KoreanNumberParser.parse("사오"))
+    }
+
+    @Test fun `named payer after the amount wins over me-words in the label`() {
+        val p = VoiceExpenseParser.parse("나가서 먹은 점심 3만원 민수가 냈어", members)!!
+        assertEquals(Payer.Named(members[1]), p.payer)
+    }
+
+    @Test fun `expense sentences are not commands`() {
+        assertNull(VoiceCommandParser.parse("출발 전에 산 커피 만원 내가 냈어"))
+        assertNull(VoiceCommandParser.parse("도착했을 때 주차비 만원"))
+        assertNull(VoiceCommandParser.parse("여행 끝나고 먹을 간식 3만원"))
+    }
+
     @Test fun `commands`() {
         assertEquals(VoiceCommand.START_TRIP, VoiceCommandParser.parse("여행 시작"))
         assertEquals(VoiceCommand.END_TRIP, VoiceCommandParser.parse("여행 끝"))

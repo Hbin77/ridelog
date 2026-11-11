@@ -126,7 +126,9 @@ fun AmountRow(name: String, amount: String, muted: Boolean = false) {
     }
 }
 
-fun qrBitmap(text: String, sizePx: Int = 512): ImageBitmap {
+fun qrBitmap(text: String, sizePx: Int = 512): ImageBitmap? = runCatching { encodeQr(text, sizePx) }.getOrNull()
+
+private fun encodeQr(text: String, sizePx: Int): ImageBitmap {
     val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, sizePx, sizePx, mapOf(EncodeHintType.CHARACTER_SET to "UTF-8", EncodeHintType.MARGIN to 1))
     val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
     for (x in 0 until sizePx) for (y in 0 until sizePx) {
