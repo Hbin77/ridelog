@@ -48,6 +48,8 @@ data class UiState(
     val totalKm: Double = 0.0,
     val lastMessage: String? = null,
     val listening: Boolean = false,
+    /** 출발 직후 차량 정보를 읽는 동안 (최대 수 초) */
+    val starting: Boolean = false,
 )
 
 /** 차량 이벤트 → 엔진 → UI 상태·음성 안내를 잇는 앱 계층. Application 범위로 하나만 산다. */
@@ -136,7 +138,8 @@ class TripController(
     }
 
     fun startTrip(assignments: Map<SeatId, Member>) {
-        if (_ui.value.phase != Phase.IDLE) return
+        if (_ui.value.phase != Phase.IDLE || _ui.value.starting) return
+        _ui.update { it.copy(starting = true) }
         scope.launch {
             val pleosSnap = if (settings.forceFake) null else pleos.snapshot()
             // 실제 차의 주행거리를 못 읽으면 이번 여행은 통째로 가상 차량 기준
@@ -157,7 +160,7 @@ class TripController(
                 beltSupported = source == Source.FAKE || Signal.SEAT_BELT in caps,
                 occupiedSeats = occupied,
             ).copy(driving = _ui.value.driving)
-            _ui.update { it.copy(phase = Phase.ACTIVE, trip = state, source = source, settlement = null) }
+            _ui.update { it.copy(phase = Phase.ACTIVE, trip = state, source = source, settlement = null, starting = false) }
             persist()
             say("${assignments.size}명 여행 기록을 시작할게요")
         }

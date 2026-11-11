@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
                     page == "settings" -> SettingsScreen(controller.settings) { page = "home" }
                     page == "history" -> HistoryScreen(history) { page = "home" }
                     else -> HomeScreen(
+                        starting = state.starting,
                         onStart = { picking = true },
                         onHistory = { page = "history" },
                         onSettings = { page = "settings" },

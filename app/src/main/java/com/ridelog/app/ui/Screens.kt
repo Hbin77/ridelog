@@ -68,7 +68,7 @@ fun ScreenFrame(title: String, onTitleLongPress: (() -> Unit)? = null, content: 
 // ---------- 홈 ----------
 
 @Composable
-fun HomeScreen(onStart: () -> Unit, onHistory: () -> Unit, onSettings: () -> Unit, onDebug: () -> Unit) {
+fun HomeScreen(starting: Boolean, onStart: () -> Unit, onHistory: () -> Unit, onSettings: () -> Unit, onDebug: () -> Unit) {
     ScreenFrame("라이드로그", onTitleLongPress = onDebug) {
         Text("함께 탄 이동의 비용을, 차가 기록하고 나눠드려요.", style = RideType.body, color = Ride.colors.onSurfaceMuted)
         Spacer(Modifier.weight(1f))
@@ -76,7 +76,8 @@ fun HomeScreen(onStart: () -> Unit, onHistory: () -> Unit, onSettings: () -> Uni
             PrimaryButton("지난 여행", onHistory, Modifier.weight(1f), secondary = true)
             PrimaryButton("설정", onSettings, Modifier.weight(1f), secondary = true)
         }
-        PrimaryButton("여행 시작", onStart, Modifier.fillMaxWidth(), icon = Icons.Filled.PlayArrow)
+        if (starting) PrimaryButton("차량 정보를 읽는 중…", {}, Modifier.fillMaxWidth(), enabled = false)
+        else PrimaryButton("여행 시작", onStart, Modifier.fillMaxWidth(), icon = Icons.Filled.PlayArrow)
     }
 }
 
