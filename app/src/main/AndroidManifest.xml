@@ -22,6 +22,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|uiMode">
             <!-- 주행 중에도 음성 전용 화면을 유지하기 위한 Distraction Optimized 선언 -->
             <meta-data android:name="distractionOptimized" android:value="true" />

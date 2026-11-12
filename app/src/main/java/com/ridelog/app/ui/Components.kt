@@ -93,7 +93,7 @@ fun PrimaryButton(
             Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(32.dp))
             Spacer(Modifier.width(Spacing.xs))
         }
-        Text(text, style = RideType.title, color = fg, textAlign = TextAlign.Center)
+        Text(text, style = RideType.button, color = fg, textAlign = TextAlign.Center)
     }
 }
 

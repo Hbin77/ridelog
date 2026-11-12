@@ -11,22 +11,24 @@
 ## 2. 색 토큰 (Dark 기본 / Light)
 | 토큰 | Dark | Light | 용도 |
 |---|---|---|---|
-| background | #0E1116 | #F6F7F9 | 화면 배경 |
-| surface | #1A1F27 | #FFFFFF | 카드·패널 |
-| surfaceVariant | #252B35 | #E9ECF1 | 좌석 칸, 구분 영역 |
-| onBackground | #F2F4F7 | #12161C | 본문 (대비 17.2:1 / 16.9:1) |
-| onSurfaceMuted | #A9B1BD | #4A5361 | 보조 텍스트 (대비 8.7:1 / 7.3:1) |
+| background | #121212 | #F6F7F9 | 화면 배경 (Pleos 야간 패널 #151515와 이어지는 중성 회색) |
+| surface | #1E1E1E | #FFFFFF | 카드·패널 |
+| surfaceVariant | #2A2A2A | #E9ECF1 | 좌석 칸, 구분 영역 |
+| onBackground | #F2F2F2 | #12161C | 본문 (대비 16.7:1 / 16.9:1) |
+| onSurfaceMuted | #AAAAAA | #4A5361 | 보조 텍스트 (대비 8.1:1 / 7.3:1, surfaceVariant 위 6.2:1) |
 | primary | #4DA3FF | #0B63CE | 주요 버튼·강조 (onPrimary 대비 7.1:1 / 5.7:1) |
 | onPrimary | #0B1220 | #FFFFFF | primary 위 텍스트 |
 | success | #3DD68C | #11804B | 탑승 확정, 정산 완료 |
 | warning | #F5B544 | #8A5A00 | 추정치 배지, 미등록 좌석 |
 | error | #FF6B6B | #B42318 | 오류 |
-| outline | #3A4250 | #C9CFD8 | 테두리 |
+| outline | #444444 | #C9CFD8 | 테두리 |
 
 ## 3. 타이포 (Pleos 서체 Asta Sans 번들 불가 시 시스템 기본)
 | 토큰 | 크기 | 굵기 | 용도 |
 |---|---|---|---|
-| display | 64sp | Bold | 주행 화면 상태, 총액 |
+| headline | 52sp | Bold | 화면 제목 (버튼보다 크게) |
+| display | 64sp | Bold | 주행 화면 상태, 송금 금액 |
+| button | 36sp | SemiBold | 버튼 글자 |
 | title | 44sp | SemiBold | 화면 제목 |
 | body | 34sp | Regular | 본문 (약 5mm — Pleos 주요 텍스트 기준) |
 | label | 26sp | Medium | 배지·보조 (약 3.8mm — 보조 텍스트 3mm 기준 상회) |
@@ -49,6 +51,7 @@
 
 ## 7. Anti-patterns (금지)
 - 주행 중 금액·리스트·키보드·QR 표시
+- 체크 아이콘 남용 — "출발", "여행 끝"처럼 확정 동작에만
 - 개인별 분담액 음성 발화 (공개 장소에서 돈 얘기 → 원래 문제를 악화)
 - "청구/요금" 표현 → "공동 경비 분담"
 - 이모지를 아이콘으로 사용, raw hex, 장식 이미지, 반복 움직임

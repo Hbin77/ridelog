@@ -23,6 +23,17 @@ import com.ridelog.app.ui.StartTripScreen
 import com.ridelog.app.ui.theme.RideLogTheme
 
 class MainActivity : ComponentActivity() {
+    /** 디버그 빌드 전용: 시연 녹화 때 `adb shell am start ... --es utterance "..."`로 음성 입력을 대신한다. */
+    private fun handleDemoIntent(intent: android.content.Intent?) {
+        if (!BuildConfig.DEBUG) return
+        intent?.getStringExtra("utterance")?.let { (application as RideLogApp).controller.handleUtterance(it) }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        handleDemoIntent(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -30,6 +41,7 @@ class MainActivity : ComponentActivity() {
         }
         // 기록은 Activity가 아니라 Application 범위에서 계속된다 (화면이 바뀌어도 끊기지 않음)
         val controller = (application as RideLogApp).controller
+        handleDemoIntent(intent)
         setContent {
             RideLogTheme {
                 val state by controller.ui.collectAsState()
@@ -51,6 +63,7 @@ class MainActivity : ComponentActivity() {
                     page == "history" -> HistoryScreen(history) { page = "home" }
                     else -> HomeScreen(
                         starting = state.starting,
+                        history = history,
                         onStart = { picking = true },
                         onHistory = { page = "history" },
                         onSettings = { page = "settings" },

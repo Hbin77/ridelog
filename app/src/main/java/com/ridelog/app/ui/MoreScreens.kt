@@ -13,7 +13,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -77,11 +76,11 @@ fun SettingsScreen(settings: SettingsStore, onDone: () -> Unit) {
         Modifier.fillMaxSize().background(c.background).verticalScroll(rememberScrollState()).padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Text("설정", style = RideType.title, color = c.onBackground)
-        Text("자주 같이 타는 사람 (첫 번째가 운전자)", style = RideType.label, color = c.onSurfaceMuted)
+        Text("설정", style = RideType.headline, color = c.onBackground)
+        Text("자주 같이 타는 사람", style = RideType.label, color = c.onSurfaceMuted)
         names.forEachIndexed { i, name ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                RideTextField("이름 ${i + 1}", name, { names[i] = it.take(10) }, Modifier.weight(1f))
+                RideTextField(if (i == 0) "운전자 (차주)" else "동승자 $i", name, { names[i] = it.take(10) }, Modifier.weight(1f))
                 if (names.size > 2) PrimaryButton("빼기", { names.removeAt(i) }, secondary = true)
             }
         }
@@ -99,7 +98,7 @@ fun SettingsScreen(settings: SettingsStore, onDone: () -> Unit) {
             settings.pricePerKwhWon = price.toDouble()
             settings.account = account.trim()
             onDone()
-        }, Modifier.fillMaxWidth(), icon = Icons.Filled.Check, enabled = priceOk && namesOk)
+        }, Modifier.fillMaxWidth(), enabled = priceOk && namesOk)
     }
 }
 
@@ -113,13 +112,16 @@ fun HistoryScreen(history: List<HistoryEntry>, onBack: () -> Unit) {
         Modifier.fillMaxSize().background(c.background).verticalScroll(rememberScrollState()).padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Text("지난 여행", style = RideType.title, color = c.onBackground)
-        Card {
-            Text("${month.month}월 합산 · 여행 ${month.trips}번 · ${"%.0f".format(month.totalKm)}km", style = RideType.label, color = c.onSurfaceMuted)
-            if (month.transfers.isEmpty()) Text("이번 달 보낼 금액이 없어요", style = RideType.body, color = c.onBackground)
-            month.transfers.forEach { t -> AmountRow("${t.fromId} → ${t.toId}", won(t.amountWon)) }
+        Text("지난 여행", style = RideType.headline, color = c.onBackground)
+        if (history.isEmpty()) {
+            Text("아직 끝난 여행이 없어요. 여행을 마치고 정산을 닫으면 여기에 모여요.", style = RideType.body, color = c.onSurfaceMuted)
+        } else {
+            Card {
+                Text("${month.month}월 합산 · 여행 ${month.trips}번 · ${"%.0f".format(month.totalKm)}km", style = RideType.label, color = c.onSurfaceMuted)
+                if (month.transfers.isEmpty()) Text("이번 달 보낼 금액이 없어요", style = RideType.body, color = c.onBackground)
+                month.transfers.forEach { t -> AmountRow("${t.fromId} → ${t.toId}", won(t.amountWon)) }
+            }
         }
-        if (history.isEmpty()) Text("아직 기록이 없어요", style = RideType.body, color = c.onSurfaceMuted)
         history.forEach { e ->
             Card {
                 Text("${fmt.format(Date(e.endedAtMillis))} · ${"%.1f".format(e.totalKm)}km", style = RideType.label, color = c.onSurfaceMuted)

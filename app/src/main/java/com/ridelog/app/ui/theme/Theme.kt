@@ -30,11 +30,12 @@ data class RideColors(
     val outline: Color,
 )
 
+// Pleos 야간 시스템 표면(#000000 바, #151515 패널)과 이어지도록 중성 회색 계열
 private val DarkTokens = RideColors(
-    background = Color(0xFF0E1116), surface = Color(0xFF1A1F27), surfaceVariant = Color(0xFF252B35),
-    onBackground = Color(0xFFF2F4F7), onSurfaceMuted = Color(0xFFA9B1BD), primary = Color(0xFF4DA3FF),
+    background = Color(0xFF121212), surface = Color(0xFF1E1E1E), surfaceVariant = Color(0xFF2A2A2A),
+    onBackground = Color(0xFFF2F2F2), onSurfaceMuted = Color(0xFFAAAAAA), primary = Color(0xFF4DA3FF),
     onPrimary = Color(0xFF0B1220), success = Color(0xFF3DD68C), warning = Color(0xFFF5B544),
-    error = Color(0xFFFF6B6B), outline = Color(0xFF3A4250),
+    error = Color(0xFFFF6B6B), outline = Color(0xFF444444),
 )
 
 private val LightTokens = RideColors(
@@ -61,11 +62,17 @@ object Sizes {
 }
 
 object RideType {
+    /** 화면 제목 — 버튼 글자보다 커야 위계가 선다. */
+    val headline = TextStyle(fontSize = 52.sp, fontWeight = FontWeight.Bold, lineHeight = 62.sp)
+    val button = TextStyle(fontSize = 36.sp, fontWeight = FontWeight.SemiBold, lineHeight = 44.sp)
     val display = TextStyle(fontSize = 64.sp, fontWeight = FontWeight.Bold, lineHeight = 76.sp)
     val title = TextStyle(fontSize = 44.sp, fontWeight = FontWeight.SemiBold, lineHeight = 54.sp)
     val body = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Normal, lineHeight = 44.sp)
     val label = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Medium, lineHeight = 34.sp)
 }
+
+/** QR 코드는 카메라 인식을 위해 테마와 관계없이 흰 바탕(여백)이 필요하다. */
+val QrQuietZone = Color(0xFFFFFFFF)
 
 val LocalRideColors = staticCompositionLocalOf { DarkTokens }
 
