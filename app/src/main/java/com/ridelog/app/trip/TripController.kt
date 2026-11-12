@@ -50,6 +50,8 @@ data class UiState(
     val listening: Boolean = false,
     /** 출발 직후 차량 정보를 읽는 동안 (최대 수 초) */
     val starting: Boolean = false,
+    /** 여행과 무관하게 마지막으로 받은 차량 값 (홈 화면 상태 표시) */
+    val vehicleSocPct: Double? = null,
 )
 
 /** 차량 이벤트 → 엔진 → UI 상태·음성 안내를 잇는 앱 계층. Application 범위로 하나만 산다. */
@@ -111,6 +113,7 @@ class TripController(
     private fun onEvent(src: Source, e: VehicleEvent) {
         // 주행 상태는 화면 제한에 쓰이므로 어느 소스든 반영 (가상 차량은 데모 패널용)
         if (e is VehicleEvent.DrivingState) _ui.update { it.copy(driving = e.driving) }
+        if (e is VehicleEvent.Soc && src == Source.PLEOS) _ui.update { it.copy(vehicleSocPct = e.percent) }
         val s = _ui.value
         val trip = s.trip ?: return
         if (s.phase != Phase.ACTIVE) return
@@ -164,6 +167,7 @@ class TripController(
                 beltSupported = source == Source.FAKE || Signal.SEAT_BELT in caps,
                 occupiedSeats = occupied,
             ).copy(driving = _ui.value.driving)
+            settings.lastSeating = assignments.filterValues { !it.id.startsWith("guest") }.mapValues { it.value.name }
             _ui.update { it.copy(phase = Phase.ACTIVE, trip = state, source = source, settlement = null, starting = false) }
             persist()
             say("${assignments.size}명 여행 기록을 시작할게요")
@@ -206,7 +210,7 @@ class TripController(
             runCatching { store.append(HistoryEntry(System.currentTimeMillis(), s.totalKm, settlement.totalWon, trip.members, settlement.transfers)) }
             _history.value = store.history()
         }
-        _ui.update { UiState(driving = it.driving) }
+        _ui.update { UiState(driving = it.driving, vehicleSocPct = it.vehicleSocPct) }
         persist()
     }
 

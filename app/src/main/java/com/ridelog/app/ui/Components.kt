@@ -29,7 +29,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -140,22 +139,6 @@ fun Badge(text: String, color: Color, container: Color? = null) {
     ) { Text(text, style = RideType.label, color = color) }
 }
 
-/** 상태 알약: "3명이 함께 가는 중 · 40km" */
-@Composable
-fun StatusPill(text: String, icon: ImageVector? = null) {
-    val c = Ride.colors
-    Row(
-        Modifier.background(c.primaryContainer, RoundedCornerShape(Sizes.buttonRadius)).padding(horizontal = Spacing.md, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (icon != null) {
-            Icon(icon, contentDescription = null, tint = c.onPrimaryContainer, modifier = Modifier.size(32.dp))
-            Spacer(Modifier.width(Spacing.xs))
-        }
-        Text(text, style = RideType.body, color = c.onPrimaryContainer)
-    }
-}
-
 @Composable
 fun Card(modifier: Modifier = Modifier, container: Color? = null, content: @Composable () -> Unit) {
     val c = Ride.colors
@@ -163,8 +146,8 @@ fun Card(modifier: Modifier = Modifier, container: Color? = null, content: @Comp
     Column(
         modifier
             .fillMaxWidth()
-            .then(if (!c.dark && container == null) Modifier.shadow(Sizes.cardElevation, shape, clip = false) else Modifier)
             .background(container ?: c.surface, shape)
+            .then(if (container == null) Modifier.border(Sizes.hairline, c.outline, shape) else Modifier)
             .padding(Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) { content() }
@@ -183,13 +166,24 @@ fun AmountRow(name: String, amount: String, muted: Boolean = false) {
 @Composable
 fun Avatar(name: String, size: Dp = 72.dp, dimmed: Boolean = false) {
     val c = Ride.colors
-    val color = c.avatars[abs(name.hashCode()) % c.avatars.size]
+    val color = avatarColor(name)
     Box(
         Modifier.size(size).alpha(if (dimmed) 0.45f else 1f).background(color, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Text(name.take(1), color = c.onAvatar, fontSize = (size.value * 0.46f).sp, style = RideType.title)
     }
+}
+
+/** 등록된 사람의 순서(운전자 0번부터). 같은 여행 안에서 색이 겹치지 않게 순서로 색을 준다. */
+val LocalCrewOrder = androidx.compose.runtime.compositionLocalOf<Map<String, Int>> { emptyMap() }
+
+/** 사람별 고정 색: 등록 순서대로 팔레트를 돌고, 목록에 없는 이름(이름 없는 동승자 등)만 글자 합으로 고른다. */
+@Composable
+fun avatarColor(name: String): Color {
+    val c = Ride.colors
+    val index = LocalCrewOrder.current[name] ?: abs(name.sumOf { it.code })
+    return c.avatars[index % c.avatars.size]
 }
 
 // ---------- 위에서 본 차 + 좌석 ----------
@@ -240,9 +234,6 @@ fun CarView(view: (SeatId) -> SeatView, modifier: Modifier = Modifier, onSeat: (
                 moveTo(bw * 0.24f, bh * 0.86f); lineTo(bw * 0.76f, bh * 0.86f)
                 lineTo(bw * 0.70f, bh * 0.92f); lineTo(bw * 0.30f, bh * 0.92f); close()
             }.let { drawPath(it, c.carGlass) }
-            // 보닛 라인
-            drawLine(c.outline, Offset(bw * 0.36f, bh * 0.05f), Offset(bw * 0.36f, bh * 0.14f), 3.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f)))
-            drawLine(c.outline, Offset(bw * 0.64f, bh * 0.05f), Offset(bw * 0.64f, bh * 0.14f), 3.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f)))
         }
         // 좌석: 앞줄 28~52%, 뒷줄 56~82%
         val seatAreaX = w * 0.16f
@@ -275,7 +266,8 @@ private fun SeatSlot(seat: SeatId, v: SeatView, modifier: Modifier, onSeat: ((Se
         else -> c.outline
     }
     val borderWidth = if (v.tone == SeatTone.SELECTED) 6.dp else 3.dp
-    val dashed = v.tone == SeatTone.EMPTY || v.tone == SeatTone.DETECTED
+    // 점선은 "센서가 감지했지만 아직 이름이 없는 자리"에만 — 의미 있는 신호로 남긴다
+    val dashed = v.tone == SeatTone.DETECTED
     Column(
         modifier
             .background(bg, shape)

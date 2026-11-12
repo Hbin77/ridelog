@@ -41,7 +41,7 @@
 
 ## APK · 시연 영상
 - `apk/박현빈_RideLog_release.apk` (release 빌드)
-- `docs/media/ridelog_demo.mp4` (72초, 자막 포함)
+- `docs/media/ridelog_demo.mp4` (71초, 자막 포함)
 
 ## 정산 규칙
 - 탑승자 구성이 바뀔 때마다 구간을 나누고, 구간 비용은 그 구간에 탄 사람끼리 균등 분담 (운전자 포함)

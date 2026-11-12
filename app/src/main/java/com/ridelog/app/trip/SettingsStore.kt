@@ -36,6 +36,14 @@ class SettingsStore(context: Context) {
 
     val needsOnboarding: Boolean get() = members.isEmpty()
 
+    /** 지난 여행의 좌석 배치(좌석 → 이름). "지난번처럼 출발"에 쓴다. */
+    var lastSeating: Map<com.ridelog.core.model.SeatId, String>
+        get() = (prefs.getString("lastSeating", null) ?: "").split(",").mapNotNull { pair ->
+            val (k, v) = pair.split("=").takeIf { it.size == 2 } ?: return@mapNotNull null
+            runCatching { com.ridelog.core.model.SeatId.valueOf(k) to v }.getOrNull()
+        }.toMap()
+        set(v) = prefs.edit().putString("lastSeating", v.entries.joinToString(",") { "${it.key.name}=${it.value}" }).apply()
+
     /** 좌석 배정 중 새로 태운 사람을 다음부터 바로 고를 수 있게 저장한다. */
     fun addMember(name: String): Member {
         val trimmed = name.trim().take(10)

@@ -55,7 +55,10 @@ class MainActivity : ComponentActivity() {
         handleDemoIntent(intent)
         setContent {
             RideLogTheme {
-                val state by controller.ui.collectAsState()
+              val state by controller.ui.collectAsState()
+              androidx.compose.runtime.CompositionLocalProvider(
+                  com.ridelog.app.ui.LocalCrewOrder provides controller.settings.members.mapIndexed { i, m -> m.name to i }.toMap(),
+              ) {
                 var picking by rememberSaveable { mutableStateOf(false) }
                 var debug by rememberSaveable { mutableStateOf(false) }
                 var page by rememberSaveable { mutableStateOf("home") }
@@ -75,14 +78,17 @@ class MainActivity : ComponentActivity() {
                     page == "history" -> HistoryScreen(history) { page = "home" }
                     else -> HomeScreen(
                         starting = state.starting,
-                        driverName = controller.settings.members.firstOrNull()?.name.orEmpty(),
+                        settings = controller.settings,
+                        socPct = state.vehicleSocPct,
                         history = history,
                         onStart = { picking = true },
+                        onQuickStart = { controller.startTrip(it) },
                         onHistory = { page = "history" },
                         onSettings = { page = "settings" },
                         onDebug = { debug = true },
                     )
                 }
+              }
             }
         }
     }

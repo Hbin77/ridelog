@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -80,7 +82,7 @@ fun SettingsScreen(settings: SettingsStore, onDone: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Text("설정", style = RideType.headline, color = c.onBackground)
-        Text("자주 같이 타는 사람 — 좌석 배정 화면에서 바로 고를 수 있어요", style = RideType.label, color = c.onSurfaceMuted)
+        Text("함께 타는 사람", style = RideType.title, color = c.onBackground)
         names.forEachIndexed { i, name ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 Avatar(name.ifBlank { "?" }, size = 72.dp)
@@ -89,12 +91,13 @@ fun SettingsScreen(settings: SettingsStore, onDone: () -> Unit) {
             }
         }
         if (names.size < 8) PrimaryButton("사람 추가", { names.add("") }, Modifier.fillMaxWidth(), icon = Icons.Filled.Add, secondary = true)
-        RideTextField("전력 단가 (원/kWh)", price, { price = it.filter { ch -> ch.isDigit() || ch == '.' } }, Modifier.fillMaxWidth(), number = true)
+        Text("요금", style = RideType.title, color = c.onBackground)
+        RideTextField("충전 단가 (원/kWh, 직접 입력)", price, { price = it.filter { ch -> ch.isDigit() || ch == '.' } }, Modifier.fillMaxWidth(), number = true)
         val priceOk = price.toDoubleOrNull()?.let { it in 50.0..2000.0 } == true
         val namesOk = names.firstOrNull()?.isNotBlank() == true
         if (!priceOk) Text("전력 단가는 50~2,000원 사이로 입력해 주세요", style = RideType.label, color = c.error)
         if (!namesOk) Text("운전자 이름을 입력해 주세요", style = RideType.label, color = c.error)
-        RideTextField("받는 계좌 (정산 메시지에 표시)", account, { account = it.take(40) }, Modifier.fillMaxWidth())
+        RideTextField("받는 계좌 (정산 문자에 함께 표시)", account, { account = it.take(40) }, Modifier.fillMaxWidth())
         Spacer(Modifier.padding(Spacing.xs))
         PrimaryButton("저장", {
             val cleaned = names.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
@@ -112,27 +115,26 @@ fun HistoryScreen(history: List<HistoryEntry>, onBack: () -> Unit) {
     val c = Ride.colors
     val month = remember(history) { monthlySummary(history) }
     val fmt = remember { SimpleDateFormat("M월 d일 HH:mm", Locale.KOREA) }
-    Column(
-        Modifier.fillMaxSize().background(c.background).verticalScroll(rememberScrollState()).padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Text("지난 여행", style = RideType.headline, color = c.onBackground)
-        if (history.isEmpty()) {
-            Text("아직 끝난 여행이 없어요. 여행을 마치고 정산을 닫으면 여기에 모여요.", style = RideType.body, color = c.onSurfaceMuted)
-        } else {
-            Card(container = c.accentContainer) {
-                Text("${month.month}월 합산 · 여행 ${month.trips}번 · ${"%.0f".format(month.totalKm)}km", style = RideType.label, color = c.onSurfaceMuted)
-                if (month.transfers.isEmpty()) Text("이번 달 보낼 금액이 없어요", style = RideType.body, color = c.onBackground)
+    ScreenFrame("지난 여행") {
+        Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            if (history.isEmpty()) {
+                Text("끝난 여행이 아직 없습니다. 정산을 보관하면 여기에 쌓이고 달마다 합산됩니다.", style = RideType.body, color = c.onSurfaceMuted)
+            } else {
+                Text("${month.month}월 합산 · 여행 ${month.trips}번 · ${"%.0f".format(month.totalKm)}km", style = RideType.title, color = c.onBackground)
+                if (month.transfers.isEmpty()) Text("이번 달은 정산할 금액이 없습니다", style = RideType.body, color = c.onBackground)
                 month.transfers.forEach { t -> AmountRow("${t.fromId} → ${t.toId}", won(t.amountWon)) }
+                Spacer(Modifier.height(Spacing.md))
             }
-        }
-        history.forEach { e ->
-            Card {
-                Text("${fmt.format(Date(e.endedAtMillis))} · ${"%.1f".format(e.totalKm)}km", style = RideType.label, color = c.onSurfaceMuted)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    e.members.forEach { m -> Avatar(m.name, size = 56.dp) }
-                    Text(e.members.joinToString(" · ") { it.name }, style = RideType.body, color = c.onBackground, modifier = Modifier.weight(1f).padding(start = Spacing.xs), maxLines = 1)
-                    Text(won(e.totalWon), style = RideType.title, color = c.onBackground)
+            history.forEach { e ->
+                Column {
+                    Row(Modifier.fillMaxWidth().heightIn(min = 96.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(e.members.joinToString(" · ") { it.name }, style = RideType.body, color = c.onBackground, maxLines = 1)
+                            Text("${fmt.format(Date(e.endedAtMillis))} · ${"%.1f".format(e.totalKm)}km", style = RideType.label, color = c.onSurfaceMuted)
+                        }
+                        Text(won(e.totalWon), style = RideType.figure, color = c.onBackground)
+                    }
+                    androidx.compose.material3.HorizontalDivider(color = c.outline, thickness = com.ridelog.app.ui.theme.Sizes.hairline)
                 }
             }
         }

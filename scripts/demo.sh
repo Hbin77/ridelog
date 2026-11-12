@@ -19,7 +19,7 @@ adb shell pm grant --user current com.ridelog.app android.permission.RECORD_AUDI
 adb shell am start -n com.ridelog.app/.MainActivity --es crew "지훈,민수,서연" >/dev/null; sleep 4
 
 step "[1] 여행 시작 — 좌석 센서가 감지한 자리에 이름 배정 (운전석 지훈, 조수석 민수, 뒷좌석 왼쪽 서연)"
-$T "여행 시작"; sleep 1; $T "민수"; $T "서연"; sleep "$W"; $T "출발"; sleep 3
+$T "좌석 배정하고 출발"; sleep 1; $T "민수"; $T "서연"; sleep "$W"; $T "출발"; sleep 3
 
 step "[2] 40km 주행 (SOC 82→72%, 약 5km/kWh)"
 $V drive; sleep "$W"; $V odo+ 20; sleep 1; $V odo+ 20; $V soc 72; sleep "$W"; $V park; sleep "$W"
@@ -36,7 +36,7 @@ step "[5] 급속 충전 64→90%"
 $V charge 1; sleep 1; $V soc 90; sleep 1; $V charge 0; sleep "$W"
 
 step "[6] 여행 끝 → 정산표"
-$T "여행 끝"; sleep 4
+$T "도착"; sleep 4
 
 step "[7] 정산표를 QR로 동승자 폰에 전달"
 $T "보내기"; sleep 4
