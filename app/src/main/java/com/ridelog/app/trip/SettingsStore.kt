@@ -26,14 +26,22 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("forceFake", false)
         set(v) = prefs.edit().putBoolean("forceFake", v).apply()
 
+    /** 첫 번째가 운전자(차주). 처음엔 비어 있고, 첫 실행 때 운전자 이름만 받는다. */
     var members: List<Member>
         get() {
-            val raw = prefs.getString("members", null) ?: return DEFAULT_MEMBERS
+            val raw = prefs.getString("members", null) ?: return emptyList()
             return raw.split("\n").filter { it.isNotBlank() }.mapIndexed { i, name -> Member("m$i", name) }
         }
         set(v) = prefs.edit().putString("members", v.joinToString("\n") { it.name }).apply()
 
-    private companion object {
-        val DEFAULT_MEMBERS = listOf("나", "민수", "서연", "지호").mapIndexed { i, n -> Member("m$i", n) }
+    val needsOnboarding: Boolean get() = members.isEmpty()
+
+    /** 좌석 배정 중 새로 태운 사람을 다음부터 바로 고를 수 있게 저장한다. */
+    fun addMember(name: String): Member {
+        val trimmed = name.trim().take(10)
+        members.firstOrNull { it.name == trimmed }?.let { return it }
+        val updated = members + Member("m${members.size}", trimmed)
+        members = updated
+        return updated.last()
     }
 }

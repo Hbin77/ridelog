@@ -15,9 +15,10 @@ adb shell am force-stop com.ridelog.app
 # 이전 시연 기록을 지우고 처음 상태로 시작
 adb shell pm clear --user current com.ridelog.app >/dev/null
 adb shell pm grant --user current com.ridelog.app android.permission.RECORD_AUDIO
-adb shell am start -n com.ridelog.app/.MainActivity >/dev/null; sleep 4
+# 시연용 운전자·동승자 이름 (실사용에서는 첫 실행 때 운전자 이름만 입력)
+adb shell am start -n com.ridelog.app/.MainActivity --es crew "지훈,민수,서연" >/dev/null; sleep 4
 
-step "[1] 여행 시작 — 좌석 배정 (운전석 나, 조수석 민수, 뒷좌석 왼쪽 서연)"
+step "[1] 여행 시작 — 좌석 센서가 감지한 자리에 이름 배정 (운전석 지훈, 조수석 민수, 뒷좌석 왼쪽 서연)"
 $T "여행 시작"; sleep 1; $T "민수"; $T "서연"; sleep "$W"; $T "출발"; sleep 3
 
 step "[2] 40km 주행 (SOC 82→72%, 약 5km/kWh)"

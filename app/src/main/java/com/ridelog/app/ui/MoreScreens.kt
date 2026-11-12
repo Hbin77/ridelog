@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
 import com.ridelog.app.trip.HistoryEntry
 import com.ridelog.app.trip.SettingsStore
 import com.ridelog.app.trip.monthlySummary
@@ -50,7 +51,7 @@ fun DrivingIdleScreen() {
 }
 
 @Composable
-private fun RideTextField(label: String, value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier, number: Boolean = false) {
+fun RideTextField(label: String, value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier, number: Boolean = false) {
     val c = Ride.colors
     OutlinedTextField(
         value = value, onValueChange = onChange, modifier = modifier, singleLine = true,
@@ -61,7 +62,9 @@ private fun RideTextField(label: String, value: String, onChange: (String) -> Un
             focusedTextColor = c.onBackground, unfocusedTextColor = c.onBackground,
             focusedBorderColor = c.primary, unfocusedBorderColor = c.outline,
             focusedLabelColor = c.primary, unfocusedLabelColor = c.onSurfaceMuted,
+            focusedContainerColor = c.surface, unfocusedContainerColor = c.surface,
         ),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(com.ridelog.app.ui.theme.Sizes.seatRadius),
     )
 }
 
@@ -77,19 +80,20 @@ fun SettingsScreen(settings: SettingsStore, onDone: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Text("설정", style = RideType.headline, color = c.onBackground)
-        Text("자주 같이 타는 사람", style = RideType.label, color = c.onSurfaceMuted)
+        Text("자주 같이 타는 사람 — 좌석 배정 화면에서 바로 고를 수 있어요", style = RideType.label, color = c.onSurfaceMuted)
         names.forEachIndexed { i, name ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Avatar(name.ifBlank { "?" }, size = 72.dp)
                 RideTextField(if (i == 0) "운전자 (차주)" else "동승자 $i", name, { names[i] = it.take(10) }, Modifier.weight(1f))
-                if (names.size > 2) PrimaryButton("빼기", { names.removeAt(i) }, secondary = true)
+                if (i > 0) PrimaryButton("빼기", { names.removeAt(i) }, secondary = true)
             }
         }
-        if (names.size < 6) PrimaryButton("사람 추가", { names.add("") }, Modifier.fillMaxWidth(), icon = Icons.Filled.Add, secondary = true)
+        if (names.size < 8) PrimaryButton("사람 추가", { names.add("") }, Modifier.fillMaxWidth(), icon = Icons.Filled.Add, secondary = true)
         RideTextField("전력 단가 (원/kWh)", price, { price = it.filter { ch -> ch.isDigit() || ch == '.' } }, Modifier.fillMaxWidth(), number = true)
         val priceOk = price.toDoubleOrNull()?.let { it in 50.0..2000.0 } == true
-        val namesOk = names.map { it.trim() }.filter { it.isNotEmpty() }.distinct().size >= 2
+        val namesOk = names.firstOrNull()?.isNotBlank() == true
         if (!priceOk) Text("전력 단가는 50~2,000원 사이로 입력해 주세요", style = RideType.label, color = c.error)
-        if (!namesOk) Text("서로 다른 이름을 2명 이상 입력해 주세요", style = RideType.label, color = c.error)
+        if (!namesOk) Text("운전자 이름을 입력해 주세요", style = RideType.label, color = c.error)
         RideTextField("받는 계좌 (정산 메시지에 표시)", account, { account = it.take(40) }, Modifier.fillMaxWidth())
         Spacer(Modifier.padding(Spacing.xs))
         PrimaryButton("저장", {
@@ -116,7 +120,7 @@ fun HistoryScreen(history: List<HistoryEntry>, onBack: () -> Unit) {
         if (history.isEmpty()) {
             Text("아직 끝난 여행이 없어요. 여행을 마치고 정산을 닫으면 여기에 모여요.", style = RideType.body, color = c.onSurfaceMuted)
         } else {
-            Card {
+            Card(container = c.accentContainer) {
                 Text("${month.month}월 합산 · 여행 ${month.trips}번 · ${"%.0f".format(month.totalKm)}km", style = RideType.label, color = c.onSurfaceMuted)
                 if (month.transfers.isEmpty()) Text("이번 달 보낼 금액이 없어요", style = RideType.body, color = c.onBackground)
                 month.transfers.forEach { t -> AmountRow("${t.fromId} → ${t.toId}", won(t.amountWon)) }
@@ -125,7 +129,11 @@ fun HistoryScreen(history: List<HistoryEntry>, onBack: () -> Unit) {
         history.forEach { e ->
             Card {
                 Text("${fmt.format(Date(e.endedAtMillis))} · ${"%.1f".format(e.totalKm)}km", style = RideType.label, color = c.onSurfaceMuted)
-                AmountRow(e.members.joinToString(" · ") { it.name }, won(e.totalWon))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                    e.members.forEach { m -> Avatar(m.name, size = 56.dp) }
+                    Text(e.members.joinToString(" · ") { it.name }, style = RideType.body, color = c.onBackground, modifier = Modifier.weight(1f).padding(start = Spacing.xs), maxLines = 1)
+                    Text(won(e.totalWon), style = RideType.title, color = c.onBackground)
+                }
             }
         }
         PrimaryButton("뒤로", onBack, Modifier.fillMaxWidth(), secondary = true)

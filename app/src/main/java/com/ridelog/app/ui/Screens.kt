@@ -8,20 +8,24 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
@@ -29,6 +33,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,7 +42,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -44,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ridelog.app.trip.HistoryEntry
+import com.ridelog.app.trip.SettingsStore
 import com.ridelog.app.trip.TripController
 import com.ridelog.app.trip.UiState
 import com.ridelog.app.trip.monthlySummary
@@ -60,24 +67,71 @@ import com.ridelog.core.model.Member
 import com.ridelog.core.model.SeatId
 import com.ridelog.core.share.ShareTextBuilder
 
+private val seatOrder = listOf(SeatId.DRIVER, SeatId.FRONT_PASSENGER, SeatId.REAR_LEFT, SeatId.REAR_CENTER, SeatId.REAR_RIGHT)
+
+// ---------- 공통 틀 ----------
+
 @Composable
-fun ScreenFrame(title: String, onTitleLongPress: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+fun ScreenFrame(
+    title: String,
+    onTitleLongPress: (() -> Unit)? = null,
+    trailing: @Composable (RowScope.() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Column(
-        Modifier.fillMaxSize().background(Ride.colors.background).padding(Spacing.lg),
+        Modifier.fillMaxSize().background(Ride.colors.background).padding(horizontal = Spacing.lg, vertical = Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Text(
-            title, style = RideType.headline, color = Ride.colors.onBackground,
-            modifier = if (onTitleLongPress != null) Modifier.clickable(onClickLabel = "개발자 패널", onClick = onTitleLongPress) else Modifier,
-        )
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Text(
+                title, style = RideType.headline, color = Ride.colors.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).then(if (onTitleLongPress != null) Modifier.clickable(onClickLabel = "개발자 패널", onClick = onTitleLongPress) else Modifier),
+            )
+            trailing?.invoke(this)
+        }
         content()
     }
 }
 
-/** 하단 고정 버튼 줄 — 모든 화면에서 같은 위치. */
+/** 2단: 왼쪽 차, 오른쪽 정보. */
 @Composable
-fun BottomBar(content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+fun ColumnScope.TwoPane(left: @Composable () -> Unit, right: @Composable ColumnScope.() -> Unit) {
+    Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+        Box(Modifier.fillMaxHeight(), contentAlignment = Alignment.Center) { left() }
+        Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.sm), content = right)
+    }
+}
+
+@Composable
+fun BottomBar(content: @Composable RowScope.() -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm), content = content)
+}
+
+@Composable
+private fun SectionLabel(text: String) = Text(text, style = RideType.label, color = Ride.colors.onSurfaceMuted)
+
+// ---------- 첫 실행: 운전자 이름 ----------
+
+@Composable
+fun OnboardingScreen(settings: SettingsStore, onDone: () -> Unit) {
+    val c = Ride.colors
+    var name by rememberSaveable { mutableStateOf("") }
+    ScreenFrame("반가워요") {
+        TwoPane(
+            left = { CarView(view = { if (it == SeatId.DRIVER) SeatView(name.ifBlank { null }, "운전자", SeatTone.SELECTED) else SeatView(null, null, SeatTone.EMPTY) }) },
+        ) {
+            Text("라이드로그는 함께 탄 이동의 비용을 차가 기록하고 나눠 주는 앱이에요.", style = RideType.body, color = c.onBackground)
+            Text("먼저 운전하시는 분 이름만 알려 주세요. 동승자는 탈 때 추가하면 돼요.", style = RideType.body, color = c.onSurfaceMuted)
+            Spacer(Modifier.height(Spacing.sm))
+            RideTextField("운전자 이름", name, { name = it.take(10) }, Modifier.fillMaxWidth())
+        }
+        BottomBar {
+            PrimaryButton("시작하기", {
+                settings.members = listOf(Member("m0", name.trim()))
+                onDone()
+            }, Modifier.weight(1f), enabled = name.isNotBlank())
+        }
+    }
 }
 
 // ---------- 홈 ----------
@@ -85,6 +139,7 @@ fun BottomBar(content: @Composable androidx.compose.foundation.layout.RowScope.(
 @Composable
 fun HomeScreen(
     starting: Boolean,
+    driverName: String,
     history: List<HistoryEntry>,
     onStart: () -> Unit,
     onHistory: () -> Unit,
@@ -92,25 +147,31 @@ fun HomeScreen(
     onDebug: () -> Unit,
 ) {
     val c = Ride.colors
-    ScreenFrame("라이드로그", onTitleLongPress = onDebug) {
-        Text("함께 탄 이동의 비용을, 차가 기록하고 나눠드려요.", style = RideType.body, color = c.onSurfaceMuted)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            StepCard("1", "좌석에 이름 배정", "출발 전에 한 번", Modifier.weight(1f))
-            StepCard("2", "그냥 운전", "좌석·계기판·배터리를 차가 기록", Modifier.weight(1f))
-            StepCard("3", "도착 후 보내기", "구간별로 나눈 정산을 QR로", Modifier.weight(1f))
-        }
-        val month = remember(history) { monthlySummary(history) }
-        if (month.trips > 0) {
-            Card {
-                Text("${month.month}월 합산 · 여행 ${month.trips}번 · ${"%.0f".format(month.totalKm)}km", style = RideType.label, color = c.onSurfaceMuted)
-                if (month.transfers.isEmpty()) Text("이번 달 보낼 금액이 없어요", style = RideType.body, color = c.onBackground)
-                month.transfers.take(3).forEach { t -> AmountRow("${t.fromId} → ${t.toId}", won(t.amountWon)) }
+    val month = remember(history) { monthlySummary(history) }
+    ScreenFrame(
+        "안녕하세요, ${driverName}님", onTitleLongPress = onDebug,
+        trailing = {
+            PrimaryButton("지난 여행", onHistory, secondary = true)
+            PrimaryButton("설정", onSettings, secondary = true)
+        },
+    ) {
+        TwoPane(left = { CarView(view = { if (it == SeatId.DRIVER) SeatView(driverName, "운전자", SeatTone.ASSIGNED) else SeatView(null, null, SeatTone.EMPTY) }) }) {
+            Text("오늘은 누구와 함께 가나요?", style = RideType.title, color = c.onBackground)
+            Step("1", "출발 전 좌석에 이름 배정", "좌석 센서가 앉은 자리를 먼저 알려 줘요")
+            Step("2", "그냥 운전하기", "누가 언제 내렸는지, 얼마나 달렸는지 차가 기록해요")
+            Step("3", "도착하면 폰으로 보내기", "구간별로 나눈 공동 경비를 QR로 전달해요")
+            if (month.trips > 0) {
+                Card(container = c.accentContainer) {
+                    SectionLabel("${month.month}월 합산 · 여행 ${month.trips}번 · ${"%.0f".format(month.totalKm)}km")
+                    if (month.transfers.isEmpty()) Text("이번 달 보낼 금액이 없어요", style = RideType.body, color = c.onBackground)
+                    month.transfers.take(3).forEach { t ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("${t.fromId} → ${t.toId}", style = RideType.body, color = c.onBackground, modifier = Modifier.weight(1f))
+                            Text(won(t.amountWon), style = RideType.title, color = c.accent)
+                        }
+                    }
+                }
             }
-        }
-        Spacer(Modifier.weight(1f))
-        BottomBar {
-            PrimaryButton("지난 여행", onHistory, Modifier.weight(1f), secondary = true)
-            PrimaryButton("설정", onSettings, Modifier.weight(1f), secondary = true)
         }
         if (starting) PrimaryButton("차량 정보를 읽는 중…", {}, Modifier.fillMaxWidth(), enabled = false)
         else PrimaryButton("여행 시작", onStart, Modifier.fillMaxWidth(), icon = Icons.Filled.PlayArrow)
@@ -118,118 +179,79 @@ fun HomeScreen(
 }
 
 @Composable
-private fun StepCard(number: String, title: String, desc: String, modifier: Modifier) {
+private fun Step(number: String, title: String, desc: String) {
     val c = Ride.colors
-    Column(
-        modifier.background(c.surface, RoundedCornerShape(Sizes.cardRadius)).padding(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-    ) {
-        Box(Modifier.size(64.dp).background(c.primary, CircleShape), contentAlignment = Alignment.Center) {
-            Text(number, style = RideType.title, color = c.onPrimary)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Box(Modifier.size(64.dp).background(c.primaryContainer, CircleShape), contentAlignment = Alignment.Center) {
+            Text(number, style = RideType.title, color = c.onPrimaryContainer)
         }
-        Text(title, style = RideType.title, color = c.onBackground)
-        Text(desc, style = RideType.label, color = c.onSurfaceMuted)
-    }
-}
-
-// ---------- 좌석 배치도 (공통) ----------
-
-private val seatRows = listOf(
-    listOf(SeatId.DRIVER, SeatId.FRONT_PASSENGER),
-    listOf(SeatId.REAR_LEFT, SeatId.REAR_CENTER, SeatId.REAR_RIGHT),
-)
-private val seatOrder = seatRows.flatten()
-
-enum class SeatTone { EMPTY, SELECTED, ASSIGNED, ONBOARD, WAITING, STRANGER }
-
-data class SeatView(val name: String?, val status: String?, val tone: SeatTone)
-
-/** 차 윤곽 안의 좌석 배치 — 앞이 위, 운전석이 왼쪽 앞. */
-@Composable
-fun SeatMap(view: (SeatId) -> SeatView, modifier: Modifier = Modifier, onSeat: ((SeatId) -> Unit)? = null) {
-    val c = Ride.colors
-    Column(
-        modifier
-            .border(3.dp, c.outline, RoundedCornerShape(topStart = 72.dp, topEnd = 72.dp, bottomStart = 36.dp, bottomEnd = 36.dp))
-            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("차량 앞", style = RideType.label, color = c.onSurfaceMuted)
-        seatRows.forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                row.forEach { seat -> SeatCell(seat, view(seat), Modifier.weight(1f), onSeat) }
-            }
+        Column {
+            Text(title, style = RideType.body, color = c.onBackground)
+            Text(desc, style = RideType.label, color = c.onSurfaceMuted)
         }
-        Text("뒤", style = RideType.label, color = c.onSurfaceMuted)
-    }
-}
-
-@Composable
-private fun SeatCell(seat: SeatId, v: SeatView, modifier: Modifier, onSeat: ((SeatId) -> Unit)?) {
-    val c = Ride.colors
-    val border: Pair<Int, Color> = when (v.tone) {
-        SeatTone.SELECTED -> 6 to c.primary
-        SeatTone.ASSIGNED, SeatTone.ONBOARD -> 3 to c.success
-        SeatTone.STRANGER -> 3 to c.warning
-        SeatTone.WAITING, SeatTone.EMPTY -> 2 to c.outline
-    }
-    val statusColor = when (v.tone) {
-        SeatTone.SELECTED -> c.primary
-        SeatTone.ONBOARD, SeatTone.ASSIGNED -> c.success
-        SeatTone.STRANGER -> c.warning
-        else -> c.onSurfaceMuted
-    }
-    Column(
-        modifier
-            .heightIn(min = Sizes.seatCell)
-            .background(c.surfaceVariant, RoundedCornerShape(Sizes.cardRadius))
-            .border(border.first.dp, border.second, RoundedCornerShape(Sizes.cardRadius))
-            .then(if (onSeat != null) Modifier.clickable(role = Role.RadioButton) { onSeat(seat) } else Modifier)
-            .padding(Spacing.sm)
-            .semantics { contentDescription = "${seat.label} ${v.name ?: "비어 있음"} ${v.status.orEmpty()}" },
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(seat.label, style = RideType.label, color = c.onSurfaceMuted)
-        Text(v.name ?: "—", style = RideType.title, color = if (v.tone == SeatTone.WAITING) c.onSurfaceMuted else c.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        v.status?.let { Text(it, style = RideType.label, color = statusColor) }
     }
 }
 
 // ---------- 좌석 배정 ----------
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun StartTripScreen(members: List<Member>, onConfirm: (Map<SeatId, Member>) -> Unit, onCancel: () -> Unit) {
+fun StartTripScreen(
+    settings: SettingsStore,
+    detected: Set<SeatId>,
+    onConfirm: (Map<SeatId, Member>) -> Unit,
+    onCancel: () -> Unit,
+) {
     val c = Ride.colors
-    val assigned = remember { mutableStateMapOf<SeatId, Member>().apply { members.firstOrNull()?.let { put(SeatId.DRIVER, it) } } }
-    var selectedSeat by remember { mutableStateOf<SeatId?>(SeatId.FRONT_PASSENGER) }
+    val people = remember { mutableStateListOf<Member>().apply { addAll(settings.members) } }
+    val assigned = remember { mutableStateMapOf<SeatId, Member>().apply { people.firstOrNull()?.let { put(SeatId.DRIVER, it) } } }
+    // 좌석 센서가 감지한 빈 자리부터 고르게 한다
+    var selected by remember { mutableStateOf(seatOrder.firstOrNull { it in detected && it != SeatId.DRIVER } ?: SeatId.FRONT_PASSENGER) }
+    var newName by rememberSaveable { mutableStateOf("") }
+    var guestCount by remember { mutableIntStateOf(0) }
+
+    fun place(m: Member) {
+        assigned.entries.removeAll { it.value.id == m.id }
+        assigned[selected] = m
+        selected = seatOrder.firstOrNull { it !in assigned && it in detected } ?: seatOrder.firstOrNull { it !in assigned } ?: selected
+    }
+
     ScreenFrame("누가 어디에 탔나요?") {
-        Text("자리를 고른 뒤 아래에서 이름을 눌러 주세요.", style = RideType.body, color = c.onSurfaceMuted)
-        SeatMap(view = { seat ->
-            val m = assigned[seat]
-            when {
-                seat == selectedSeat -> SeatView(m?.name, "선택됨", SeatTone.SELECTED)
-                m != null -> SeatView(m.name, if (seat == SeatId.DRIVER) "운전자" else null, SeatTone.ASSIGNED)
-                else -> SeatView(null, null, SeatTone.EMPTY)
-            }
-        }, modifier = Modifier.fillMaxWidth(), onSeat = { selectedSeat = it })
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            members.forEach { m ->
-                val seatOfMember = assigned.entries.firstOrNull { it.value == m }?.key
-                MemberChip(m.name, assignedTo = seatOfMember, modifier = Modifier.weight(1f)) {
-                    if (seatOfMember != null) {
-                        assigned.remove(seatOfMember)
-                        selectedSeat = seatOfMember
-                    } else {
-                        val seat = selectedSeat ?: return@MemberChip
-                        assigned[seat] = m
-                        selectedSeat = seatOrder.firstOrNull { it !in assigned }
-                    }
+        TwoPane(left = {
+            CarView(view = { seat ->
+                val m = assigned[seat]
+                when {
+                    seat == selected -> SeatView(m?.name, "선택됨", SeatTone.SELECTED)
+                    m != null -> SeatView(m.name, if (seat == SeatId.DRIVER) "운전자" else null, SeatTone.ASSIGNED)
+                    seat in detected -> SeatView(null, "감지됨", SeatTone.DETECTED)
+                    else -> SeatView(null, null, SeatTone.EMPTY)
+                }
+            }, onSeat = { selected = it })
+        }) {
+            val others = detected - SeatId.DRIVER
+            if (others.isNotEmpty()) StatusPill("좌석 센서가 동승자 ${others.size}자리를 감지했어요")
+            Text("${selected.label}에 누가 앉았나요?", style = RideType.title, color = c.onBackground)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                people.forEach { m ->
+                    val seatOf = assigned.entries.firstOrNull { it.value.id == m.id }?.key
+                    PersonChip(m.name, seatOf) { if (seatOf == selected) assigned.remove(selected) else place(m) }
                 }
             }
+            SectionLabel("처음 타는 사람")
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                RideTextField("이름", newName, { newName = it.take(10) }, Modifier.weight(1f))
+                PrimaryButton("추가", {
+                    val m = settings.addMember(newName)
+                    if (people.none { it.id == m.id }) people.add(m)
+                    place(m)
+                    newName = ""
+                }, icon = Icons.Filled.Add, enabled = newName.isNotBlank())
+            }
+            PrimaryButton("이름 없이 앉히기", {
+                guestCount += 1
+                place(Member("guest$guestCount", "동승자 $guestCount"))
+            }, Modifier.fillMaxWidth(), secondary = true)
         }
-        Spacer(Modifier.weight(1f))
         BottomBar {
             PrimaryButton("취소", onCancel, Modifier.weight(1f), secondary = true)
             PrimaryButton("${assigned.size}명 출발", { onConfirm(assigned.toMap()) }, Modifier.weight(2f),
@@ -238,28 +260,26 @@ fun StartTripScreen(members: List<Member>, onConfirm: (Map<SeatId, Member>) -> U
     }
 }
 
-/** 배정 전: 테두리 버튼 / 배정 후: 체크 + 좌석 이름(다시 누르면 해제). */
+/** 사람 고르기: 아바타 + 이름, 이미 앉은 사람은 좌석 이름 표시. */
 @Composable
-private fun MemberChip(name: String, assignedTo: SeatId?, modifier: Modifier, onClick: () -> Unit) {
+private fun PersonChip(name: String, seat: SeatId?, onClick: () -> Unit) {
     val c = Ride.colors
-    Column(
-        modifier
+    val shape = RoundedCornerShape(Sizes.buttonRadius)
+    Row(
+        Modifier
             .heightIn(min = Sizes.parkedTouch)
-            .background(if (assignedTo != null) c.surfaceVariant else c.surface, RoundedCornerShape(Sizes.buttonRadius))
-            .border(2.dp, if (assignedTo != null) c.surfaceVariant else c.primary, RoundedCornerShape(Sizes.buttonRadius))
-            .clickable(role = Role.Button, onClickLabel = if (assignedTo != null) "$name 배정 해제" else "$name 배정", onClick = onClick)
-            .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .background(if (seat != null) c.primaryContainer else c.surface, shape)
+            .border(2.dp, if (seat != null) c.primary else c.outline, shape)
+            .clickable(role = Role.Button, onClickLabel = "$name 앉히기", onClick = onClick)
+            .padding(start = 12.dp, end = Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (assignedTo != null) {
-                Icon(Icons.Filled.Check, contentDescription = null, tint = c.success, modifier = Modifier.size(28.dp))
-                Spacer(Modifier.width(4.dp))
-            }
-            Text(name, style = RideType.button, color = if (assignedTo != null) c.onSurfaceMuted else c.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Avatar(name, size = 72.dp)
+        Column {
+            Text(name, style = RideType.button, color = c.onBackground, maxLines = 1)
+            seat?.let { Text(it.shortLabel, style = RideType.label, color = c.onPrimaryContainer) }
         }
-        assignedTo?.let { Text(it.label, style = RideType.label, color = c.onSurfaceMuted) }
     }
 }
 
@@ -268,31 +288,32 @@ private fun MemberChip(name: String, assignedTo: SeatId?, modifier: Modifier, on
 @Composable
 fun DrivingScreen(state: UiState, onMic: () -> Unit) {
     val c = Ride.colors
-    val onboard = state.trip?.onboard?.size ?: 0
+    val trip = state.trip
+    val onboard = trip?.onboard?.size ?: 0
     Column(
         Modifier.fillMaxSize().background(c.background).padding(Spacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("기록 중 · ${onboard}명", style = RideType.display, color = c.onBackground)
+        Text("${onboard}명이 함께 가는 중", style = RideType.display, color = c.onBackground)
+        Spacer(Modifier.height(Spacing.md))
+        if (trip != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy((-12).dp)) {
+                trip.onboard.sortedBy { it.ordinal }.mapNotNull { trip.assignments[it]?.name }.forEach { Avatar(it, size = 88.dp) }
+            }
+        }
         Spacer(Modifier.height(Spacing.xl))
-        MicButton(state.listening, onMic)
+        Box(
+            Modifier
+                .size(Sizes.drivingTouch * 1.5f)
+                .background(if (state.listening) c.accent else c.primary, CircleShape)
+                .clickable(role = Role.Button, onClickLabel = "음성으로 경비 추가", onClick = onMic)
+                .semantics { contentDescription = "음성으로 경비 추가" },
+            contentAlignment = Alignment.Center,
+        ) { Icon(MicIcon, contentDescription = null, tint = c.onPrimary, modifier = Modifier.size(96.dp)) }
         Spacer(Modifier.height(Spacing.md))
         Text(if (state.listening) "듣고 있어요" else "\"간식 3만원 내가 냈어\"", style = RideType.body, color = c.onSurfaceMuted)
     }
-}
-
-@Composable
-private fun MicButton(listening: Boolean, onClick: () -> Unit) {
-    val c = Ride.colors
-    Box(
-        Modifier
-            .size(Sizes.drivingTouch * 1.5f)
-            .background(if (listening) c.success else c.primary, CircleShape)
-            .clickable(role = Role.Button, onClickLabel = "음성으로 경비 추가", onClick = onClick)
-            .semantics { contentDescription = "음성으로 경비 추가" },
-        contentAlignment = Alignment.Center,
-    ) { Icon(MicIcon, contentDescription = null, tint = c.onPrimary, modifier = Modifier.size(72.dp)) }
 }
 
 // ---------- 정차 중 여행 진행 ----------
@@ -302,9 +323,8 @@ private fun TripState.seatView(seat: SeatId): SeatView {
     val on = seat in onboard
     return when {
         m != null && on -> SeatView(m.name, if (seat == SeatId.DRIVER) "운전 중" else "탑승", SeatTone.ONBOARD)
-        // 앞 구간에 탔던 사람이면 "내림", 아직 한 번도 안 탔으면 "아직 안 탐"
         m != null -> SeatView(m.name, if (legs.any { m.id in it.memberIds }) "내림" else "아직 안 탐", SeatTone.WAITING)
-        on -> SeatView("미등록", "탑승 감지", SeatTone.STRANGER)
+        on -> SeatView(null, "미등록 탑승", SeatTone.STRANGER)
         else -> SeatView(null, null, SeatTone.EMPTY)
     }
 }
@@ -317,39 +337,49 @@ fun ActiveParkedScreen(state: UiState, onMic: () -> Unit, onEnd: () -> Unit, onD
     val trip = state.trip ?: return
     val c = Ride.colors
     val names = trip.members.associate { it.id to it.name }
+    val km = trip.legs.sumOf { it.distanceKm } + (trip.odometerKm - trip.currentLeg.startKm)
     ScreenFrame("여행 기록 중", onTitleLongPress = onDebug) {
-        state.lastMessage?.let { Text(it, style = RideType.body, color = c.success) }
-        Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            // 왼쪽: 지금 누가 타 있는지 (좌석 센서 실시간)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                Text("좌석 센서", style = RideType.label, color = c.onSurfaceMuted)
-                SeatMap(view = { trip.seatView(it) }, modifier = Modifier.fillMaxWidth())
+        TwoPane(left = { CarView(view = { trip.seatView(it) }) }) {
+            StatusPill("${trip.onboard.size}명이 함께 가는 중 · ${"%.1f".format(km)}km", RouteIcon)
+            state.lastMessage?.let { Text(it, style = RideType.body, color = c.onSurfaceMuted) }
+            trip.legs.forEachIndexed { i, leg ->
+                TimelineItem(RouteIcon, "구간 ${i + 1}", "${"%.1f".format(leg.distanceKm)}km", leg.memberIds.mapNotNull { names[it] }.joinToString(" · "))
             }
-            // 오른쪽: 구간 기록과 경비
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                Text("구간 기록", style = RideType.label, color = c.onSurfaceMuted)
-                trip.legs.forEachIndexed { i, leg ->
-                    Card {
-                        AmountRow("구간 ${i + 1}", "${"%.1f".format(leg.distanceKm)}km")
-                        Text(leg.memberIds.mapNotNull { names[it] }.joinToString(" · "), style = RideType.label, color = c.onSurfaceMuted)
-                    }
-                }
-                Card {
-                    AmountRow("구간 ${trip.legs.size + 1} · 진행 중", "${"%.1f".format(trip.odometerKm - trip.currentLeg.startKm)}km")
-                    Text(trip.namesOf(trip.currentLeg.seats), style = RideType.label, color = c.onSurfaceMuted)
-                }
-                if (trip.expenses.isNotEmpty()) Text("경비", style = RideType.label, color = c.onSurfaceMuted)
-                trip.expenses.forEach { e ->
-                    Card {
-                        AmountRow(e.label, won(e.amountWon))
-                        Text("${names[e.payerId]} 결제 · ${e.sharedBy.size}명 분담", style = RideType.label, color = c.onSurfaceMuted)
-                    }
-                }
+            TimelineItem(RouteIcon, "구간 ${trip.legs.size + 1} · 진행 중", "${"%.1f".format(trip.odometerKm - trip.currentLeg.startKm)}km", trip.namesOf(trip.currentLeg.seats), active = true)
+            trip.chargingStops.forEach { stop ->
+                val from = stop.startSocPct?.let { "%.0f".format(it) } ?: "?"
+                val to = stop.endSocPct?.let { "%.0f".format(it) } ?: "?"
+                TimelineItem(BoltIcon, "충전", "$from → $to%", "충전으로 늘어난 배터리는 비용에서 빼요")
+            }
+            if (trip.charging) {
+                val from = trip.chargingStartSoc?.let { "%.0f".format(it) } ?: "?"
+                val to = trip.socPct?.let { "%.0f".format(it) } ?: "?"
+                TimelineItem(BoltIcon, "충전 중", "$from → $to%", "충전으로 늘어난 배터리는 비용에서 빼요", active = true)
+            }
+            trip.expenses.forEach { e ->
+                TimelineItem(ReceiptIcon, e.label, won(e.amountWon), "${names[e.payerId]} 결제 · ${e.sharedBy.size}명 분담")
             }
         }
         BottomBar {
             PrimaryButton("경비 말하기", onMic, Modifier.weight(1f), icon = MicIcon, secondary = true)
             PrimaryButton("여행 끝", onEnd, Modifier.weight(1f), icon = Icons.Filled.Check)
+        }
+    }
+}
+
+@Composable
+private fun TimelineItem(icon: ImageVector, title: String, value: String, sub: String, active: Boolean = false) {
+    val c = Ride.colors
+    Card(container = if (active) c.primaryContainer else null) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Box(Modifier.size(56.dp).background(if (active) c.surface else c.surfaceVariant, CircleShape), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = c.primary, modifier = Modifier.size(32.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title, style = RideType.body, color = c.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(sub, style = RideType.label, color = c.onSurfaceMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Text(value, style = RideType.title, color = c.onBackground)
         }
     }
 }
@@ -364,28 +394,40 @@ fun ReviewScreen(state: UiState, controller: TripController, onDone: () -> Unit)
     var showSend by rememberSaveable { mutableStateOf(false) }
     val names = trip.members.associate { it.id to it.name }
     if (showSend) {
-        SendScreen(
-            ShareTextBuilder.build("여행", state.totalKm, trip.members, s, controller.settings.account),
-            s, names, controller.settings.account, onBack = { showSend = false }, onDone = onDone,
-        )
+        SendScreen(ShareTextBuilder.build("여행", state.totalKm, trip.members, s, controller.settings.account), s, names, controller.settings.account,
+            onBack = { showSend = false }, onDone = onDone)
         return
     }
     ScreenFrame("공동 경비 정산") {
-        Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            Text("총 ${"%.1f".format(state.totalKm)}km · 총 경비 ${won(s.totalWon)}", style = RideType.body, color = c.onSurfaceMuted)
-            TransferCard(s, names)
-            Card {
-                Text("내역", style = RideType.label, color = c.onSurfaceMuted)
+        Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+            Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                StatusPill("총 ${"%.1f".format(state.totalKm)}km · 공동 경비 ${won(s.totalWon)}", RouteIcon)
+                SectionLabel("누가 누구에게")
+                if (s.transfers.isEmpty()) Card { Text("보낼 금액이 없어요", style = RideType.title, color = c.onBackground) }
+                s.transfers.forEach { t -> TransferCard(names[t.fromId].orEmpty(), names[t.toId].orEmpty(), t.amountWon) }
+                if (s.transfers.isNotEmpty()) SectionLabel("송금은 ${SettlementSolver.UNIT_WON}원 단위로 맞췄어요")
+                val unassigned = trip.legs.flatMap { it.unassignedSeats }.toSet()
+                if (unassigned.isNotEmpty()) Text("이름 없는 탑승(${unassigned.joinToString { it.shortLabel }})은 정산에서 뺐어요", style = RideType.label, color = c.warning)
+            }
+            Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                SectionLabel("이렇게 나눴어요")
                 s.items.forEach { item ->
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                        Text(item.label, style = RideType.body, color = c.onBackground, modifier = Modifier.weight(1f))
-                        if (item.kind == CostKind.ENERGY) Badge(if (item.estimated) "추정" else "차량 실측", if (item.estimated) c.warning else c.success)
-                        Text(won(item.amountWon), style = RideType.body, color = c.onBackground)
+                    Card {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                            Icon(if (item.kind == CostKind.ENERGY) BoltIcon else ReceiptIcon, contentDescription = null, tint = c.primary, modifier = Modifier.size(32.dp))
+                            Text(item.label, style = RideType.body, color = c.onBackground, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(won(item.amountWon), style = RideType.title, color = c.onBackground)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                            if (item.kind == CostKind.ENERGY) {
+                                Badge(if (item.estimated) "추정" else "차량 실측", if (item.estimated) c.warning else c.onPrimaryContainer, if (item.estimated) null else c.primaryContainer)
+                            }
+                            Text(
+                                (if (item.kind == CostKind.EXPENSE) "${names[item.payerId]} 결제 · " else "") + item.sharedBy.mapNotNull { names[it] }.joinToString(" · ") + " 분담",
+                                style = RideType.label, color = c.onSurfaceMuted, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
-                    Text(
-                        (if (item.kind == CostKind.EXPENSE) "${names[item.payerId]} 결제 · " else "") + item.sharedBy.mapNotNull { names[it] }.joinToString(" · ") + " 분담",
-                        style = RideType.label, color = c.onSurfaceMuted,
-                    )
                 }
                 trip.expenses.forEach { e ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -393,17 +435,13 @@ fun ReviewScreen(state: UiState, controller: TripController, onDone: () -> Unit)
                         Box(
                             Modifier.size(Sizes.parkedTouch).clickable(role = Role.Button, onClickLabel = "${e.label} 삭제") { controller.removeExpense(e.id) },
                             contentAlignment = Alignment.Center,
-                        ) { Icon(Icons.Filled.Delete, contentDescription = "${e.label} 삭제", tint = c.onSurfaceMuted) }
+                        ) { Icon(Icons.Filled.Delete, contentDescription = "${e.label} 삭제", tint = c.onSurfaceMuted, modifier = Modifier.size(36.dp)) }
                     }
                 }
-            }
-            Card {
-                Text("사람별 몫 (원 단위 그대로)", style = RideType.label, color = c.onSurfaceMuted)
-                trip.members.forEach { m -> AmountRow(m.name, won(s.owedByMember[m.id] ?: 0.0), muted = true) }
-            }
-            val unassigned = trip.legs.flatMap { it.unassignedSeats }.toSet()
-            if (unassigned.isNotEmpty()) {
-                Text("이름 없는 탑승: ${unassigned.joinToString { it.label }} — 정산에서 제외했어요", style = RideType.body, color = c.warning)
+                Card {
+                    SectionLabel("사람별 몫 (원 단위 그대로)")
+                    trip.members.forEach { m -> AmountRow(m.name, won(s.owedByMember[m.id] ?: 0.0), muted = true) }
+                }
             }
         }
         BottomBar {
@@ -413,21 +451,17 @@ fun ReviewScreen(state: UiState, controller: TripController, onDone: () -> Unit)
     }
 }
 
-/** 가장 중요한 숫자: 누가 누구에게 얼마. */
+/** 보내는 사람 → 받는 사람, 코랄 큰 금액. */
 @Composable
-private fun TransferCard(s: Settlement, names: Map<String, String>) {
+private fun TransferCard(from: String, to: String, amount: Long) {
     val c = Ride.colors
-    Card {
-        Text("누가 누구에게", style = RideType.label, color = c.onSurfaceMuted)
-        if (s.transfers.isEmpty()) Text("보낼 금액이 없어요", style = RideType.title, color = c.onBackground)
-        s.transfers.forEach { t ->
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("${names[t.fromId]} → ${names[t.toId]}", style = RideType.title, color = c.onBackground, modifier = Modifier.weight(1f))
-                Text(won(t.amountWon), style = RideType.display, color = c.onBackground)
-            }
-        }
-        if (s.transfers.isNotEmpty()) {
-            Text("송금은 ${SettlementSolver.UNIT_WON}원 단위로 맞췄어요 (사람별 몫과 몇 원 차이 날 수 있어요)", style = RideType.label, color = c.onSurfaceMuted)
+    Card(container = c.accentContainer) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Avatar(from, size = 72.dp)
+            Icon(ArrowIcon, contentDescription = "에게", tint = c.onSurfaceMuted, modifier = Modifier.size(36.dp))
+            Avatar(to, size = 72.dp)
+            Text("$from → $to", style = RideType.body, color = c.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(start = Spacing.xs))
+            Text(won(amount), style = RideType.display, color = c.accent)
         }
     }
 }
@@ -437,19 +471,20 @@ fun SendScreen(text: String, s: Settlement, names: Map<String, String>, account:
     val c = Ride.colors
     val qr = remember(text) { qrBitmap(text, 720) }
     ScreenFrame("폰으로 받기") {
-        Text("각자 폰 카메라로 찍으면 정산 내용이 열려요.", style = RideType.body, color = c.onSurfaceMuted)
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            if (qr != null) {
-                Image(qr, contentDescription = "정산 내용 QR 코드", modifier = Modifier.size(560.dp).background(QrQuietZone, RoundedCornerShape(Sizes.cardRadius)).padding(Spacing.sm))
-            } else {
-                Text("내용이 길어 QR을 만들 수 없어요. 아래 내용을 확인해 주세요", style = RideType.body, color = c.warning, textAlign = TextAlign.Center)
+        Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(Spacing.lg), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(600.dp).background(QrQuietZone, RoundedCornerShape(Sizes.cardRadius)).padding(Spacing.md),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (qr != null) Image(qr, contentDescription = "정산 내용 QR 코드", modifier = Modifier.fillMaxSize())
+                else Text("내용이 길어 QR을 만들 수 없어요", style = RideType.body, color = c.warning, textAlign = TextAlign.Center)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Text("각자 폰 카메라로 찍으면 정산 내용이 열려요", style = RideType.title, color = c.onBackground)
+                s.transfers.forEach { t -> TransferCard(names[t.fromId].orEmpty(), names[t.toId].orEmpty(), t.amountWon) }
+                if (account.isNotBlank()) SectionLabel("받는 계좌 $account")
             }
         }
-        Card {
-            s.transfers.forEach { t -> AmountRow("${names[t.fromId]} → ${names[t.toId]}", won(t.amountWon)) }
-            if (account.isNotBlank()) Text("받는 계좌 $account", style = RideType.label, color = c.onSurfaceMuted)
-        }
-        Spacer(Modifier.weight(1f))
         BottomBar {
             PrimaryButton("뒤로", onBack, Modifier.weight(1f), secondary = true)
             PrimaryButton("완료", onDone, Modifier.weight(2f))

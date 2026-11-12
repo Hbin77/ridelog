@@ -27,7 +27,7 @@
 
 ## 실행 방법
 1. APK 설치: `adb install -g apk/박현빈_RideLog_release.apk`
-2. 앱 실행 → **여행 시작** → 좌석에 이름 배정 → **출발**
+2. 앱 실행 → 첫 실행 시 운전자 이름 입력 → **여행 시작** → 좌석 센서가 감지한 자리에 이름 배정(처음 타는 사람은 그 자리에서 추가) → **출발**
 3. Virtual Console(`adb forward tcp:8088 tcp:8088` → http://127.0.0.1:8088)에서 기어 D·속도, 좌석 점유, 주행거리, SOC를 바꾸면 기록이 따라갑니다.
 4. 자동 시연: `scripts/demo.sh` — 3명 EV 여행(중간 하차 1명, 음성 경비 1건, 충전 1회)을 Virtual Console과 화면 탭으로 재생
    - 자막 포함 영상 만들기: `scripts/make_video.sh` → `docs/media/ridelog_demo.mp4`
@@ -41,7 +41,7 @@
 
 ## APK · 시연 영상
 - `apk/박현빈_RideLog_release.apk` (release 빌드)
-- `docs/media/ridelog_demo.mp4` (73초, 자막 포함)
+- `docs/media/ridelog_demo.mp4` (72초, 자막 포함)
 
 ## 정산 규칙
 - 탑승자 구성이 바뀔 때마다 구간을 나누고, 구간 비용은 그 구간에 탄 사람끼리 균등 분담 (운전자 포함)

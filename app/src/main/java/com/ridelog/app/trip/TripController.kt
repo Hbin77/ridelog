@@ -137,6 +137,10 @@ class TripController(
         speechOut.speak(msg)
     }
 
+    /** 좌석 센서가 지금 사람이 앉아 있다고 알려 주는 자리 (좌석 배정 화면 안내용). */
+    fun detectedSeats(): Set<SeatId> =
+        if (Signal.SEAT_OCCUPANCY in pleos.capabilities.value) pleos.occupiedSeats() else emptySet()
+
     fun startTrip(assignments: Map<SeatId, Member>) {
         if (_ui.value.phase != Phase.IDLE || _ui.value.starting) return
         _ui.update { it.copy(starting = true) }

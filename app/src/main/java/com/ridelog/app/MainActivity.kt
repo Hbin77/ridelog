@@ -18,15 +18,25 @@ import com.ridelog.app.ui.DrivingScreen
 import com.ridelog.app.ui.HistoryScreen
 import com.ridelog.app.ui.SettingsScreen
 import com.ridelog.app.ui.HomeScreen
+import com.ridelog.app.ui.OnboardingScreen
 import com.ridelog.app.ui.ReviewScreen
 import com.ridelog.app.ui.StartTripScreen
 import com.ridelog.app.ui.theme.RideLogTheme
 
 class MainActivity : ComponentActivity() {
+    private val onboarded = androidx.compose.runtime.mutableStateOf(true)
+
     /** 디버그 빌드 전용: 시연 녹화 때 `adb shell am start ... --es utterance "..."`로 음성 입력을 대신한다. */
     private fun handleDemoIntent(intent: android.content.Intent?) {
         if (!BuildConfig.DEBUG) return
-        intent?.getStringExtra("utterance")?.let { (application as RideLogApp).controller.handleUtterance(it) }
+        val controller = (application as RideLogApp).controller
+        // 시연 준비: 운전자·동승자 이름 목록 (adb input 으로는 한글 입력이 안 되므로)
+        intent?.getStringExtra("crew")?.let { crew ->
+            controller.settings.members = crew.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                .mapIndexed { i, n -> com.ridelog.core.model.Member("m$i", n) }
+            onboarded.value = true
+        }
+        intent?.getStringExtra("utterance")?.let { controller.handleUtterance(it) }
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -41,6 +51,7 @@ class MainActivity : ComponentActivity() {
         }
         // 기록은 Activity가 아니라 Application 범위에서 계속된다 (화면이 바뀌어도 끊기지 않음)
         val controller = (application as RideLogApp).controller
+        onboarded.value = !controller.settings.needsOnboarding
         handleDemoIntent(intent)
         setContent {
             RideLogTheme {
@@ -58,11 +69,13 @@ class MainActivity : ComponentActivity() {
                     state.driving -> DrivingIdleScreen()
                     state.phase == Phase.ACTIVE -> ActiveParkedScreen(state, controller::listen, controller::endTrip) { debug = true }
                     state.phase == Phase.REVIEW -> ReviewScreen(state, controller) { controller.reset() }
-                    picking -> StartTripScreen(controller.settings.members, { controller.startTrip(it); picking = false }) { picking = false }
+                    !onboarded.value -> OnboardingScreen(controller.settings) { onboarded.value = true }
+                    picking -> StartTripScreen(controller.settings, controller.detectedSeats(), { controller.startTrip(it); picking = false }) { picking = false }
                     page == "settings" -> SettingsScreen(controller.settings) { page = "home" }
                     page == "history" -> HistoryScreen(history) { page = "home" }
                     else -> HomeScreen(
                         starting = state.starting,
+                        driverName = controller.settings.members.firstOrNull()?.name.orEmpty(),
                         history = history,
                         onStart = { picking = true },
                         onHistory = { page = "history" },
