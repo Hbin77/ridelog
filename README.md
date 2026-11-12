@@ -26,7 +26,7 @@
 - Android Studio JBR 21, Gradle 8.13, AGP 8.7.3, Kotlin 2.0.21, minSdk 28, targetSdk 34
 
 ## 실행 방법
-1. APK 설치: `adb install -g apk/TEAM_RideLog_release.apk`
+1. APK 설치: `adb install -g apk/박현빈_RideLog_release.apk`
 2. 앱 실행 → **여행 시작** → 좌석에 이름 배정 → **출발**
 3. Virtual Console(`adb forward tcp:8088 tcp:8088` → http://127.0.0.1:8088)에서 기어 D·속도, 좌석 점유, 주행거리, SOC를 바꾸면 기록이 따라갑니다.
 4. 자동 시연: `scripts/demo.sh` — 3명 EV 여행(중간 하차 1명, 음성 경비 1건, 충전 1회)을 Virtual Console과 화면 탭으로 재생
@@ -40,7 +40,7 @@
 ```
 
 ## APK · 시연 영상
-- `apk/TEAM_RideLog_release.apk` (release 빌드)
+- `apk/박현빈_RideLog_release.apk` (release 빌드)
 - `docs/media/ridelog_demo.mp4` (77초, 자막 포함)
 
 ## 정산 규칙
