@@ -36,6 +36,7 @@ data class RideColors(
     val carBody: Color,
     val carGlass: Color,
     val tire: Color,
+    val lamp: Color,
     val avatars: List<Color>,
     val onAvatar: Color,
 ) {
@@ -50,7 +51,7 @@ private val LightTokens = RideColors(
     primaryContainer = Color(0xFFD7F4EE), onPrimaryContainer = Color(0xFF0B5E54),
     accent = Color(0xFFC23E2B), accentContainer = Color(0xFFFFE4DD),
     warning = Color(0xFF9A5B00), error = Color(0xFFB3261E), outline = Color(0xFFE2D8CC),
-    carBody = Color(0xFFFFFFFF), carGlass = Color(0xFFCFE3FF), tire = Color(0xFF2B3038),
+    carBody = Color(0xFFFFFFFF), carGlass = Color(0xFFCFE3FF), tire = Color(0xFF2B3038), lamp = Color(0xFFFFE9A8),
     avatars = listOf(Color(0xFFBFEDE3), Color(0xFFFFD3C9), Color(0xFFCFE3FF), Color(0xFFFFE3A8), Color(0xFFE4D7FF)),
     onAvatar = Color(0xFF1F2430),
 )
@@ -63,7 +64,7 @@ private val DarkTokens = RideColors(
     primaryContainer = Color(0xFF1F4B44), onPrimaryContainer = Color(0xFFF1F5F4),
     accent = Color(0xFFFF8A76), accentContainer = Color(0xFF3A2420),
     warning = Color(0xFFFFC266), error = Color(0xFFFFB4AB), outline = Color(0xFF33424A),
-    carBody = Color(0xFF1F2B32), carGlass = Color(0xFF26405F), tire = Color(0xFF0A0F12),
+    carBody = Color(0xFF1F2B32), carGlass = Color(0xFF26405F), tire = Color(0xFF0A0F12), lamp = Color(0xFFF2E3A6),
     avatars = listOf(Color(0xFF1F4B44), Color(0xFF5A2E27), Color(0xFF26405F), Color(0xFF574516), Color(0xFF3E3360)),
     onAvatar = Color(0xFFF1F5F4),
 )

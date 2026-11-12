@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -37,6 +38,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -206,47 +208,70 @@ fun CarView(view: (SeatId) -> SeatView, modifier: Modifier = Modifier, onSeat: (
         val w = maxWidth
         val h = maxHeight
         Canvas(Modifier.fillMaxSize()) {
-            val bw = size.width
-            val bh = size.height
-            val bodyL = bw * 0.10f
-            val bodyR = bw * 0.90f
-            // 바퀴
-            val tireW = bw * 0.09f
-            val tireH = bh * 0.13f
-            listOf(0.17f, 0.70f).forEach { y ->
-                drawRoundRect(c.tire, Offset(bodyL - tireW * 0.55f, bh * y), Size(tireW, tireH), CornerRadius(tireW / 2))
-                drawRoundRect(c.tire, Offset(bodyR - tireW * 0.45f, bh * y), Size(tireW, tireH), CornerRadius(tireW / 2))
+            val W = size.width
+            val H = size.height
+            fun p(x: Float, y: Float) = Offset(W * x, H * y)
+            val line = 3.dp.toPx()
+            // 바퀴 (휠 아치 밖으로 살짝 보임)
+            val tw = W * 0.075f
+            val th = H * 0.12f
+            listOf(0.10f, 0.70f).forEach { y ->
+                drawRoundRect(c.tire, p(0.055f, y), Size(tw, th), CornerRadius(tw * 0.35f))
+                drawRoundRect(c.tire, Offset(W * 0.945f - tw, H * y), Size(tw, th), CornerRadius(tw * 0.35f))
             }
+            // 차체: 앞은 둥글게 좁아지고 뒤는 각이 살짝 선 실루엣
+            val body = Path().apply {
+                moveTo(W * 0.30f, H * 0.018f)
+                quadraticTo(W * 0.50f, H * 0.004f, W * 0.70f, H * 0.018f)
+                cubicTo(W * 0.86f, H * 0.026f, W * 0.905f, H * 0.075f, W * 0.905f, H * 0.14f)
+                lineTo(W * 0.905f, H * 0.885f)
+                cubicTo(W * 0.905f, H * 0.95f, W * 0.86f, H * 0.986f, W * 0.72f, H * 0.986f)
+                lineTo(W * 0.28f, H * 0.986f)
+                cubicTo(W * 0.14f, H * 0.986f, W * 0.095f, H * 0.95f, W * 0.095f, H * 0.885f)
+                lineTo(W * 0.095f, H * 0.14f)
+                cubicTo(W * 0.095f, H * 0.075f, W * 0.14f, H * 0.026f, W * 0.30f, H * 0.018f)
+                close()
+            }
+            drawPath(body, c.carBody)
+            drawPath(body, c.outline, style = Stroke(width = line))
             // 사이드미러
-            drawOval(c.outline, Offset(bodyL - bw * 0.06f, bh * 0.27f), Size(bw * 0.08f, bh * 0.035f))
-            drawOval(c.outline, Offset(bodyR - bw * 0.02f, bh * 0.27f), Size(bw * 0.08f, bh * 0.035f))
-            // 차체
-            val radius = CornerRadius(bw * 0.24f, bw * 0.24f)
-            drawRoundRect(c.carBody, Offset(bodyL, bh * 0.01f), Size(bodyR - bodyL, bh * 0.98f), radius)
-            drawRoundRect(c.outline, Offset(bodyL, bh * 0.01f), Size(bodyR - bodyL, bh * 0.98f), radius, style = Stroke(width = 4.dp.toPx()))
-            // 앞유리
+            listOf(0.035f to 0.10f, 0.865f to 0.10f).forEach { (x, mw) ->
+                drawRoundRect(c.carBody, p(x, 0.25f), Size(W * mw, H * 0.03f), CornerRadius(W * 0.03f))
+                drawRoundRect(c.outline, p(x, 0.25f), Size(W * mw, H * 0.03f), CornerRadius(W * 0.03f), style = Stroke(width = line * 0.8f))
+            }
+            // 헤드램프 · 테일램프
+            drawLine(c.lamp, p(0.17f, 0.052f), p(0.35f, 0.034f), strokeWidth = 6.dp.toPx(), cap = StrokeCap.Round)
+            drawLine(c.lamp, p(0.65f, 0.034f), p(0.83f, 0.052f), strokeWidth = 6.dp.toPx(), cap = StrokeCap.Round)
+            drawLine(c.accent, p(0.18f, 0.968f), p(0.82f, 0.968f), strokeWidth = 5.dp.toPx(), cap = StrokeCap.Round)
+            // 앞유리 (위가 둥근 사다리꼴)
             Path().apply {
-                moveTo(bw * 0.22f, bh * 0.25f); lineTo(bw * 0.78f, bh * 0.25f)
-                lineTo(bw * 0.70f, bh * 0.16f); lineTo(bw * 0.30f, bh * 0.16f); close()
+                moveTo(W * 0.155f, H * 0.262f); lineTo(W * 0.845f, H * 0.262f)
+                lineTo(W * 0.775f, H * 0.158f)
+                quadraticTo(W * 0.50f, H * 0.134f, W * 0.225f, H * 0.158f); close()
             }.let { drawPath(it, c.carGlass) }
+            // 실내 (파노라마 루프 너머로 보이는 좌석 공간)
+            drawRoundRect(c.carGlass.copy(alpha = 0.28f), p(0.135f, 0.272f), Size(W * 0.73f, H * 0.575f), CornerRadius(W * 0.06f))
+            // 센터 콘솔
+            drawRoundRect(c.outline, p(0.475f, 0.31f), Size(W * 0.05f, H * 0.19f), CornerRadius(W * 0.025f))
+            // B필러 이음새
+            drawLine(c.outline, p(0.095f, 0.555f), p(0.135f, 0.555f), strokeWidth = line)
+            drawLine(c.outline, p(0.865f, 0.555f), p(0.905f, 0.555f), strokeWidth = line)
             // 뒷유리
             Path().apply {
-                moveTo(bw * 0.24f, bh * 0.86f); lineTo(bw * 0.76f, bh * 0.86f)
-                lineTo(bw * 0.70f, bh * 0.92f); lineTo(bw * 0.30f, bh * 0.92f); close()
+                moveTo(W * 0.19f, H * 0.857f); lineTo(W * 0.81f, H * 0.857f)
+                lineTo(W * 0.745f, H * 0.918f)
+                quadraticTo(W * 0.50f, H * 0.932f, W * 0.255f, H * 0.918f); close()
             }.let { drawPath(it, c.carGlass) }
         }
-        // 좌석: 앞줄 28~52%, 뒷줄 56~82%
-        val seatAreaX = w * 0.16f
-        val seatAreaW = w * 0.68f
-        val gap = 10.dp
+        // 좌석: 앞줄(콘솔 사이 간격) 30~52%, 뒷줄 58~82%
         Row(
-            Modifier.offset(x = seatAreaX, y = h * 0.28f).width(seatAreaW).heightIn(min = h * 0.24f),
-            horizontalArrangement = Arrangement.spacedBy(gap),
-        ) { frontRow.forEach { SeatSlot(it, view(it), Modifier.weight(1f).heightIn(min = h * 0.24f), onSeat) } }
+            Modifier.offset(x = w * 0.165f, y = h * 0.295f).width(w * 0.67f),
+            horizontalArrangement = Arrangement.spacedBy(w * 0.09f),
+        ) { frontRow.forEach { SeatSlot(it, view(it), Modifier.weight(1f).height(h * 0.225f), onSeat) } }
         Row(
-            Modifier.offset(x = seatAreaX, y = h * 0.56f).width(seatAreaW).heightIn(min = h * 0.25f),
-            horizontalArrangement = Arrangement.spacedBy(gap),
-        ) { rearRow.forEach { SeatSlot(it, view(it), Modifier.weight(1f).heightIn(min = h * 0.25f), onSeat) } }
+            Modifier.offset(x = w * 0.155f, y = h * 0.585f).width(w * 0.69f),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) { rearRow.forEach { SeatSlot(it, view(it), Modifier.weight(1f).height(h * 0.235f), onSeat) } }
     }
 }
 
@@ -268,15 +293,26 @@ private fun SeatSlot(seat: SeatId, v: SeatView, modifier: Modifier, onSeat: ((Se
     val borderWidth = if (v.tone == SeatTone.SELECTED) 6.dp else 3.dp
     // 점선은 "센서가 감지했지만 아직 이름이 없는 자리"에만 — 의미 있는 신호로 남긴다
     val dashed = v.tone == SeatTone.DETECTED
+    val backrest = when (v.tone) {
+        SeatTone.ONBOARD, SeatTone.ASSIGNED, SeatTone.SELECTED -> c.primary.copy(alpha = 0.22f)
+        SeatTone.STRANGER, SeatTone.DETECTED -> c.warning.copy(alpha = 0.18f)
+        else -> c.outline
+    }
     Column(
         modifier
             .background(bg, shape)
+            // 위에서 본 좌석: 앞쪽(위)이 방석, 아래쪽 띠가 등받이
+            .drawBehind {
+                val r = CornerRadius(Sizes.seatRadius.toPx())
+                val band = size.height * 0.17f
+                drawRoundRect(backrest, Offset(0f, size.height - band), Size(size.width, band), r)
+            }
             .then(
                 if (dashed) Modifier.dashedBorder(borderColor, Sizes.seatRadius, 3.dp)
                 else Modifier.border(borderWidth, borderColor, shape),
             )
             .then(if (onSeat != null) Modifier.clickable(role = Role.RadioButton, onClickLabel = "${seat.label} 선택") { onSeat(seat) } else Modifier)
-            .padding(vertical = 10.dp, horizontal = 4.dp)
+            .padding(top = 8.dp, bottom = 30.dp, start = 4.dp, end = 4.dp)
             .semantics { contentDescription = "${seat.label} ${v.name ?: "비어 있음"} ${v.status.orEmpty()}" },
         verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
